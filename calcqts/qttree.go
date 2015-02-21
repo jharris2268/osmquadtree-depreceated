@@ -5,7 +5,7 @@ import (
 	"github.com/jharris2268/osmquadtree/elements"
 
 	"fmt"
-	//"sync"
+	"sync"
 
 	"bufio"
 	"io/ioutil"
@@ -234,24 +234,29 @@ func qtTreeIterInt(qtt *qtTree, i uint32, res chan QtTreeEntry) {
 
 }
 
-func FindQtTree(dataFunc func(func(int,elements.ExtendedBlock) error) error, maxLevel uint) QtTree {
+func FindQtTree(inchans []chan elements.ExtendedBlock, maxLevel uint) QtTree {
 	res := newQtTree(0, 2000)
 	intr := make(chan map[quadtree.Quadtree]int32)
 	
-    addf := func (i int, bl elements.ExtendedBlock) error {
-        b := map[quadtree.Quadtree]int32{}
-        for i := 0; i < bl.Len(); i++ {
-
-            q := bl.Element(i).(interface{Quadtree() quadtree.Quadtree}).Quadtree()
-            b[q]++
-
-        }
-        intr <- b
-        return nil
-	}
-    
     go func() {
-        dataFunc(addf)
+        wg:=sync.WaitGroup{}
+        wg.Add(len(inchans))
+        for _,inc := range inchans {
+            go func (inc chan elements.ExtendedBlock) {
+                for bl := range inc {
+                    b := map[quadtree.Quadtree]int32{}
+                    for i := 0; i < bl.Len(); i++ {
+
+                        q := bl.Element(i).(interface{Quadtree() quadtree.Quadtree}).Quadtree()
+                        b[q]++
+
+                    }
+                    intr <- b
+                }
+                wg.Done()
+            }(inc)
+        }
+        wg.Wait()
         close(intr)
     }()
 

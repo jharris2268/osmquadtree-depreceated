@@ -77,14 +77,25 @@ func MakeAllocBlockStore(ty string) AllocBlockStore {
             
 func AddData(
     abs AllocBlockStore,
-    dataFunc func(func(int,elements.ExtendedBlock) error) error,
-    addFunc func(chan IdPacked) func(int, elements.ExtendedBlock) error) error {
+    inChans []chan elements.ExtendedBlock,
+    addFunc func(elements.ExtendedBlock, chan IdPacked) error) error {
     
     res:=make(chan IdPacked)
     go func() {
-        dataFunc(addFunc(res))
+        wg:=sync.WaitGroup{}
+        wg.Add(len(inChans))
+        for _,c:=range inChans {
+            go func(c chan elements.ExtendedBlock) {
+                for b:=range c {
+                    addFunc(b, res)
+                }
+                wg.Done()
+            }(c)
+        }
+        wg.Wait()
         close(res)
     }()
+    
     for oo := range res {
         abs.Add(oo)
     }
@@ -120,13 +131,13 @@ func ReadData(abs AllocBlockStore, nc int, outputFunc func(int,int,int,IdPackedL
 
     
 func SortByTile(
-    dataFunc func(func(int,elements.ExtendedBlock) error) error,
-    addFunc func(chan IdPacked) func(int,elements.ExtendedBlock) error,
+    inChans []chan elements.ExtendedBlock,
+    addFunc func(elements.ExtendedBlock,chan IdPacked) error,
     nc int,
     outputFunc func(int,int,int,IdPackedList) error,
     abs AllocBlockStore) error {
 
-    AddData(abs,dataFunc,addFunc)
+    AddData(abs,inChans,addFunc)
     err:=ReadData(abs,nc,outputFunc)
     abs.Finish()
     return err
@@ -151,41 +162,53 @@ func makeIdPacked(alloc Allocater, o elements.Element) IdPacked {
     return IdPacked{alloc(o), o.Pack()}
 }
     
-func makeAddToPackedPairBlock(alloc Allocater, res chan IdPacked) func(int, elements.ExtendedBlock) error {
-    return func(k int, bl elements.ExtendedBlock) error {
-        if bl==nil || bl.Len()==0 { return nil }
-        for i:=0; i < bl.Len(); i++ {
-            o := bl.Element(i)
-            res <- makeIdPacked(alloc,o)
-        }
-        return nil
+func addToPackedPairBlock(bl elements.ExtendedBlock, alloc Allocater, res chan IdPacked) error {
+    if bl==nil || bl.Len()==0 { return nil }
+    for i:=0; i < bl.Len(); i++ {
+        o := bl.Element(i)
+        res <- makeIdPacked(alloc,o)
     }
+    return nil
 }
  
 
 func SortElementsByAlloc(
-        dataFunc func(func(int,elements.ExtendedBlock) error) error,
+        inChans []chan elements.ExtendedBlock,
         alloc Allocater,
         nc int,
-        makeBlock func(int, int, int,elements.Block) error,
-        absType string) error {
+        makeBlock func(int, int,elements.Block) (elements.ExtendedBlock, error),
+        absType string) ([]chan elements.ExtendedBlock, error) {
     
     if absType == "inmem" {
-        return SortInMem(dataFunc,alloc,nc,makeBlock)
+        return SortInMem(inChans,alloc,nc,makeBlock)
     }
     
     abs:=MakeAllocBlockStore(absType)
     
-    addFunc := func(res chan IdPacked) func(int,elements.ExtendedBlock) error {
-        return makeAddToPackedPairBlock(alloc,res)
+    addFunc := func(bl elements.ExtendedBlock, res chan IdPacked) error {
+        return addToPackedPairBlock(bl,alloc,res)
     }
     
-    outputFunc :=func(i int, idx int, al int, all IdPackedList) error {
-         pp := makeByElementId(all)
-         return makeBlock(i, idx, al,pp)
+    res := make([]chan elements.ExtendedBlock,nc)
+    for i,_:=range res {
+        res[i] = make(chan elements.ExtendedBlock)
     }
-
-    return SortByTile(dataFunc,addFunc,nc,outputFunc,abs)
+        
+    outputFunc :=func(i int, idx int, al int, all IdPackedList) error {
+        pp := makeByElementId(all)
+        bl,err := makeBlock(idx, al, pp)
+        if err!=nil { return err }
+        res[i] <- bl
+        return nil
+    }
+    
+    go func() {
+        SortByTile(inChans,addFunc,nc,outputFunc,abs)
+        for _,r:=range res {
+            close(r)
+        }
+    }()
+    return res,nil
 }
 
       

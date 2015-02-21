@@ -13,6 +13,7 @@ import (
     "errors"
     "sort"
     "runtime/debug"
+    "sync"
 )
 
 func readWayNodes(infn string, nc int) (blocksort.AllocBlockStore, elements.Block, error) {
@@ -21,62 +22,56 @@ func readWayNodes(infn string, nc int) (blocksort.AllocBlockStore, elements.Bloc
     for i,_:=range rels {
         rels[i] = make(elements.ByElementId, 0, 1000000)
     }
-    dataFunc := func(p func(int,elements.ExtendedBlock) error) error {
-        return readfile.ProcessFileBlocksDataMulti(infn,p,nc,false,true,true)
-        //return readfile.ProcessFileBlocksFullMulti(infn,p,nc)
-    }
-    addFunc  := func(res chan blocksort.IdPacked) func(int, elements.ExtendedBlock) error {
-        return func(cc int, block elements.ExtendedBlock) error {
-            if block==nil { return nil }
-            
-            if (block.Idx()%1371)==0  {
-                fmt.Printf("%8d %s\n",block.Idx(), block.String())
-            }
-                
-            
-            if block.Len()==0 { return nil }
-            
-            //li := block.Len()-1
-            //if block.Element(li).Type()==elements.Node { return nil }
-            
-            rp := map[int]nodeWaySlice{}            
-            
-            for i:=0; i < block.Len(); i++ {
-                e:=block.Element(i)
-                switch e.Type() {
-                    case elements.Node:
-                        continue
-                    case elements.Way:
-                        ei := e.Id()
-                        rf,ok := e.(elements.Refs)
-                        if !ok {
-                            return errors.New("NO REFS")
-                        }
-                        for j:=0; j < rf.Len(); j++ {
-                            r:=rf.Ref(j)
-                            k:=int(r>>20)
-                            rp[k] = append(rp[k], nodeWay{r,ei})
-                            
-                        }
-                    case elements.Relation:
-                        rels[cc] = append(rels[cc], e)
-                }
-            }
-            /*if len(rp)>0 {
-                println(cc,block.Idx(),block.Len(),len(rp),utils.MemstatsStr())
-            }*/
-            
-            for k,v := range rp {
-                res <- blocksort.IdPacked{k, v.Pack()}
-            }
-            return nil
+    
+    inChans, err := readfile.ReadSomeElementsMulti(infn,nc,false,true,true)
+    if err!=nil { return nil,nil,err}
+    
+    addFunc  := func(block elements.ExtendedBlock, res chan blocksort.IdPacked) error {
+        
+        if block==nil { return nil }
+        
+        if (block.Idx()%1371)==0  {
+            fmt.Printf("%8d %s\n",block.Idx(), block.String())
         }
+        
+        cc := block.Idx() % nc  
+        
+        if block.Len()==0 { return nil }
+ 
+        rp := map[int]nodeWaySlice{}            
+        
+        for i:=0; i < block.Len(); i++ {
+            e:=block.Element(i)
+            switch e.Type() {
+                case elements.Node:
+                    continue
+                case elements.Way:
+                    ei := e.Id()
+                    rf,ok := e.(elements.Refs)
+                    if !ok {
+                        return errors.New("NO REFS")
+                    }
+                    for j:=0; j < rf.Len(); j++ {
+                        r:=rf.Ref(j)
+                        k:=int(r>>20)
+                        rp[k] = append(rp[k], nodeWay{r,ei})
+                        
+                    }
+                case elements.Relation:
+                    rels[cc] = append(rels[cc], e)
+            }
+        }
+        
+        for k,v := range rp {
+            res <- blocksort.IdPacked{k, v.Pack()}
+        }
+        return nil
     }
             
                 
     //abs:= blocksort.MakeAllocBlockStore("tempfilesplit")
-    abs:= blocksort.MakeAllocBlockStore("tempfileslim")
-    err:=blocksort.AddData(abs,dataFunc,addFunc)
+    abs := blocksort.MakeAllocBlockStore("tempfileslim")
+    err =  blocksort.AddData(abs,inChans,addFunc)
     
     if err!=nil {
         return nil,nil,err
@@ -224,6 +219,10 @@ func (n *nwi) Idx() int { return n.idx }
 func iterNodes(infn string) <-chan []nodeAndWays {
     res:=make(chan utils.Idxer)
     
+    
+        
+        
+    
     add := func(i int, bl elements.ExtendedBlock) error {
         //println(bl.String())
         if bl==nil {
@@ -252,9 +251,22 @@ func iterNodes(infn string) <-chan []nodeAndWays {
         return nil
     }
     
+    blcks, err := readfile.ReadSomeElementsMulti(infn, 4, true, false, false)
+    if err!=nil { return nil }
+    
+    
     go func() {
-        readfile.ProcessFileBlocksDataMulti(infn,add,4,true,false,false)
-        //readfile.ProcessFileBlocksFullMulti(infn,add,4)
+        wg:=sync.WaitGroup{}
+        wg.Add(len(blcks))
+        for i,bl:=range blcks {
+            go func(i int, bl chan elements.ExtendedBlock) {
+                for b:=range bl {
+                    add(i,b)
+                }
+                wg.Done()
+            }(i,bl)
+        }
+        wg.Wait()
         close(res)
     }()
     

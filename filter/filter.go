@@ -1,11 +1,11 @@
 package filter
 
 import (
-	"github.com/jharris2268/osmquadtree/readfile"
+	//"github.com/jharris2268/osmquadtree/readfile"
 	"github.com/jharris2268/osmquadtree/elements"
 	"github.com/jharris2268/osmquadtree/quadtree"
 	
-    "sync"
+    //"sync"
 )
 
 func filterByQuadtree(inchan <-chan elements.ExtendedBlock, bbox quadtree.Bbox) (<-chan elements.ExtendedBlock, error) {
@@ -261,24 +261,19 @@ func filterBlock(bl elements.ExtendedBlock, ids IdSet) elements.ExtendedBlock {
         bl.Idx(), ee, bl.Quadtree(), bl.StartDate(), bl.EndDate(), bl.Tags())
 }
     
-func FilterObjs(inblock <-chan elements.ExtendedBlock, ids IdSet) <-chan elements.ExtendedBlock {
-    out := make(chan elements.ExtendedBlock)
+func FilterObjs(inblock []chan elements.ExtendedBlock, ids IdSet) ([]chan elements.ExtendedBlock,error) {
+    out := make([]chan elements.ExtendedBlock,len(inblock))
     
-    go func() {
-        wg:=sync.WaitGroup{}
-        wg.Add(4)
-        for i:=0; i < 4; i++ {
-            go func() {
-                for bl:=range inblock {
-                    out <- filterBlock(bl,ids)
-                }
-                wg.Done()
-            }()
-        }
-        wg.Wait()
-        close(out)
-    }()
-    return readfile.SortExtendedBlockChan(out)
+    for i,_ := range inblock {
+        out[i] = make(chan elements.ExtendedBlock)
+        go func(i int) {
+            for bl:=range inblock[i] {
+                out[i] <- filterBlock(bl,ids)
+            }
+            close(out[i])
+        }(i)
+    }
+    return out, nil
 }
         
         

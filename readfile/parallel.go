@@ -97,36 +97,37 @@ func ReadPbfFileFullParallel(fns []string, iterFunc func(string) <-chan elements
 }
 
 
-func ProcessPbfFileFullMerge(origfn string, chgfns []string, proc func(int, elements.ExtendedBlock) error, nc int) (error) {
+func ReadExtendedBlockMultiMerge(origfn string, chgfns []string, nc int) ([]chan elements.ExtendedBlock, error) {
     
     
     
-    orig,err := ReadFileBlocksFullSorted(origfn, nc)
-    if err!=nil { return err } 
+    orig,err := ReadExtendedBlockMultiSorted(origfn, nc)
+    if err!=nil { return nil, err } 
     
     iterFunc := func(s string) <-chan elements.ExtendedBlock {
-        a,_ := ReadFileBlocksFull(s)
+        a,_ := ReadExtendedBlock(s)
         return a
     }
     
     chgs,err := ReadPbfFileFullParallel(chgfns, iterFunc)
-    if err!=nil { return err }
+    if err!=nil { return nil, err }
     
     merged,err:= change.MergeChange(chgs)
-    if err!=nil { return err }
+    if err!=nil { return nil, err }
     
-    return change.MergeOrigAndChange(orig,merged,nc,proc)
+    return change.MergeOrigAndChange(orig,merged,nc)
         
 }
 
-func ProcessPbfFileFullMergeQts(origfn string, chgfns []string, passQt func(quadtree.Quadtree) bool, proc func(int, elements.ExtendedBlock) error, nc int) (error) {
+
+func ReadExtendedBlockMultiMergeQts(origfn string, chgfns []string, nc int, passQt func(quadtree.Quadtree) bool) ([]chan elements.ExtendedBlock, error) {
     
     getBlocks := func(s string) <-chan elements.ExtendedBlock {
         nc:=1
         if strings.HasSuffix(s,"pbf") {
             nc=4
         }
-        a,_ := ReadFileBlocksSorted(s, nc, MakeProcessFileBlocksPartialQts(passQt) )
+        a,_ := ReadExtendedBlockMultiSortedQts(s, nc, passQt)
         return a
     }
     
@@ -134,34 +135,16 @@ func ProcessPbfFileFullMergeQts(origfn string, chgfns []string, passQt func(quad
     //origs := SortExtendedBlockChan(orig)
     
     chgs,err := ReadPbfFileFullParallel(chgfns, getBlocks)
-    if err!=nil { return err }
+    if err!=nil { return nil, err }
     
     merged,err:= change.MergeChange(chgs)
-    if err!=nil { return err }
+    if err!=nil { return nil, err }
     
-    return change.MergeOrigAndChange(orig,merged,nc,proc)
+    return change.MergeOrigAndChange(orig,merged,nc)
         
 }
 
 
-
-func MakeProcessPbfFile(origfn string, nc int) func(func(int, elements.ExtendedBlock) error) error {
-    return func(proc func(int, elements.ExtendedBlock) error) error {
-        return ProcessFileBlocksFullMulti(origfn, proc, nc)
-    }
-}
-
-func MakeProcessMergeChangePbfFile(origfn string, chgfns []string, nc int) func(func(int, elements.ExtendedBlock) error) error {
-    
-    
-    return func(proc func(int, elements.ExtendedBlock) error) error {
-        
-        if chgfns == nil {
-            return ProcessFileBlocksFullMulti(origfn, proc, nc)
-        }
-        return ProcessPbfFileFullMerge(origfn, chgfns, proc, nc)
-    }
-}
 
 
 func MakePassQt(qts map[quadtree.Quadtree]bool) func(quadtree.Quadtree) bool {
@@ -171,46 +154,50 @@ func MakePassQt(qts map[quadtree.Quadtree]bool) func(quadtree.Quadtree) bool {
     }
 }
 
-func MakeProcessPbfFileFullMergeQts(origfn string, chgfns []string, passQt func(quadtree.Quadtree) bool, nc int) func(func(int, elements.ExtendedBlock) error) error {
-    return func(proc func(int, elements.ExtendedBlock) error) error {
-        return ProcessPbfFileFullMergeQts(origfn, chgfns, passQt, proc, nc)
-    }
-}
 
-
-func ReadMergeChangePbfSorted(origfn string, chgfns []string, passQt func(quadtree.Quadtree) bool, nc int) (<-chan elements.ExtendedBlock,error) {
+func ReadMergeChangePbfSorted(origfn string, chgfns []string, nc int, passQt func(quadtree.Quadtree) bool) (<-chan elements.ExtendedBlock,error) {
     
-    pf := func(o string, proc func(int, elements.ExtendedBlock) error, n int) error {
-        return ProcessPbfFileFullMergeQts(origfn, chgfns, passQt, proc, nc)
-    }
-    return ReadFileBlocksSorted(origfn,nc,pf)
+    dd,err := ReadExtendedBlockMultiMergeQts(origfn,chgfns,nc,passQt)
+    if err!=nil { return nil,err }
+    return CollectExtendedBlockChans(dd,false),nil
 }
 
-func ReadChangePbfSortedUnmerged(origfn string, chgfns []string, passQt func(quadtree.Quadtree) bool, nc int) (<-chan elements.ExtendedBlock,error) {
+func ReadExtendedBlockMultiQtsUnmerged(origfn string, chgfns []string, nc int, passQt func(quadtree.Quadtree) bool, nout int) ([]chan elements.ExtendedBlock,error) {
+    
     getBlocks := func(s string) <-chan elements.ExtendedBlock {
         nc:=1
         if strings.HasSuffix(s,"pbf") {
             nc=4
         }
-        a,_ := ReadFileBlocksSorted(s, nc, MakeProcessFileBlocksPartialQts(passQt) )
+        a,_ := ReadExtendedBlockMultiSortedQts(s, nc, passQt)
         return a
     }
     
-    out:=make(chan elements.ExtendedBlock)
+    
+    
     cc,err := ReadPbfFileFullParallel(append([]string{origfn},chgfns...), getBlocks)
     if err!=nil {
         return nil,err
     }
+    
+    
+    out:=make([]chan elements.ExtendedBlock, nout)
+    for i,_ := range out {
+        out[i]=make(chan elements.ExtendedBlock)
+    }
+    
     go func() {
         x:=0
         for c:=range cc {
             for _,b:=range c {
                 b.SetIdx(x)
-                out <- b
+                out[x%nout] <- b
                 x++
             }
         }
-        close(out)
+        for _,o:=range out {
+            close(o)
+        }
     }()
     return out,nil
 }

@@ -226,33 +226,19 @@ func findExistingObjs(ts map[int64]int, nfs map[int64]srcBlock,
 			sort.Sort(fps)
 
 			fmt.Printf("load %d tiles from %s\n", len(fps), ss.fn)
-			//inc, err := osmread.ReadPbfFileMultiPartial(ss.fn, 4, 4, true, fps)
+			
             
-            addf:=func(j int, b elements.ExtendedBlock) error {
-                incc <- blii{i, b}
-                
-                return nil
-            }
-                
+            bll,err := readfile.ReadExtendedBlockMultiSortedPartial(ss.fn,4,fps)
             
-            err := readfile.ProcessFileBlocksFullMultiPartial(ss.fn,fps,addf,4)
-            
-			if err != nil {
+            if err != nil {
 				panic(err.Error())
 			}
-
-/*
-			z := 0
-			debug.FreeOSMemory()
-			for bl := range inc {
-				incc <- blii{i, bl}
-				if (z % 4000) == 3990 {
-					//print(" debug.FreeOSMemory()@ ",z," ")
-					debug.FreeOSMemory()
-				}
-				z++
-			}*/
-
+            
+            for bl := range bll {
+                incc <- blii{i,bl}
+            }
+            
+			
 		}
 		close(incc)
 	}()
@@ -288,11 +274,6 @@ func findExistingObjs(ts map[int64]int, nfs map[int64]srcBlock,
 		close(toc)
 
 	}()
-
-	//tos:=map[int64]simpleobj.SimpleObj{}
-
-	//toc2 := make(chan simpleobj.SimpleObj)
-	//go func (){
     
     println("have",len(nodeLocs),"nodeLocs")
     
@@ -315,44 +296,17 @@ func findExistingObjs(ts map[int64]int, nfs map[int64]srcBlock,
                     ll := o.(elements.LonLat)
                     
 					nodeLocs[oi] = nodeLoc{ll.Lon(),ll.Lat()}
-					//objQts[oi]=o.Quadtree()
+					
 					tos[oi] = cc
 					cc++
 				}
-
-				//nodeLocs[oi] = o.Data().(simpleobj.SimpleObjNodeLoc)
-				//tempobjs.add(o)
-				//toc2 <- o
 			}
 		}
 	}
     println("have",len(nodeLocs),"nodeLocs")
-	//close(toc2)
-	//}()
-	/*println("have",len(tos),"tempobjs waiting")
-	  for oi,o:=range tos {
-
-	  //for o:=range toc2 {
-	      tempobjs.add(o)
-	      nodeLocs[oi] = o.Data().(simpleobj.SimpleObjNodeLoc)
-
-
-	  }
-	  println("have",tempobjs.Len(),"tempobjs")
-	  if len(tos) != tempobjs.Len() || len(tos)==0{
-	      panic(0)
-	  }*/
+	
 	sort.Sort(tempobjs)
-	/*for i:=0; i < tempobjs.Len();i++ {
-	    o:=tempobjs.get(i)
-	    oi :=  (int64(o.ObjectType())<<59) | o.ObjectId()
-	    if o.ObjectId()==2250146319 || o.ObjectId() == 2177704274 {
-	        println(tsp[oi]>>32,o.String(),o.ChangeType(),quadtree.QuadtreeString(o.Quadtree()))
-	    }
-
-	    objQts[oi]=o.Quadtree()
-	}*/
-    
+	
 	return tempobjs, nil
 }
 
@@ -361,48 +315,6 @@ type srcBlock struct {
 	fn  string
 	idx read.BlockIdx
 }
-/*
-type newchgobj struct {
-	o  simpleobj.SimpleObj
-	ct byte
-	qt int64
-}
-
-func (nco newchgobj) String() string {
-	return fmt.Sprintf("Newchgobj: %s %d [%-18s]", nco.o.String(), nco.ct, quadtree.QuadtreeString(nco.qt))
-}
-
-func (nco newchgobj) ObjectType() byte {
-	return nco.o.ObjectType()
-}
-
-func (nco newchgobj) ObjectId() int64 {
-	return nco.o.ObjectId()
-}
-
-func (nco newchgobj) ChangeType() byte {
-	return nco.ct
-}
-
-func (nco newchgobj) Quadtree() int64 {
-	return nco.qt
-}
-
-func (nco newchgobj) Info() simpleobj.SimpleObjInfo {
-	return nco.o.Info()
-}
-
-func (nco newchgobj) Tags() simpleobj.SimpleObjTags {
-	return nco.o.Tags()
-}
-
-func (nco newchgobj) Data() simpleobj.SimpleObjData {
-	return nco.o.Data()
-}
-
-func (nco newchgobj) Pack() []byte {
-	return osmread.MakeSimpleObjUnpacked(nco).Pack()
-}*/
 
 func newChangeEle(e elements.Element, ct elements.ChangeType, q quadtree.Quadtree) elements.Element {
     ee := elements.UnpackElement(e.Pack())
@@ -411,9 +323,6 @@ func newChangeEle(e elements.Element, ct elements.ChangeType, q quadtree.Quadtre
     ee.SetQuadtree(q)
     return ee
 }
-    
-    
-    
 
 
 func CalcUpdateTiles(prfx string, xmlfn string, enddate elements.Timestamp, newfn string, state int64) (<-chan elements.ExtendedBlock, quadtree.QuadtreeSlice, error) {

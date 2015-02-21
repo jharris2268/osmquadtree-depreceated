@@ -6,7 +6,7 @@ import (
     "github.com/jharris2268/osmquadtree/utils"
     
     "fmt"
-    "sync"
+    
 )
 
 type qtPacked struct {
@@ -70,13 +70,12 @@ type blockPair struct {
 func AddQts(
     mainFn string,
     qtsFn string,
-    nc int,
-    addFunc func(int, elements.ExtendedBlock) error) error {
-    
-    main,err := ReadFileBlocksFullSorted(mainFn,nc)
-    if err!=nil { return err }
-    qts,err := ReadFileBlocksFullSorted(qtsFn,nc)
-    if err!=nil { return err }
+    nc int) ([]chan elements.ExtendedBlock,error) {
+        
+    main,err := ReadExtendedBlockMultiSorted(mainFn,nc)
+    if err!=nil { return nil,err }
+    qts,err := ReadExtendedBlockMultiSorted(qtsFn,nc)
+    if err!=nil { return nil,err }
     
     qtj := make([]chan blockPair, nc)
     for i,_ := range qtj {
@@ -127,24 +126,25 @@ func AddQts(
         }
     }()
     
-    wg:=sync.WaitGroup{}
-    wg.Add(len(qtj))
     
+    res := make([]chan elements.ExtendedBlock, nc)
+        
     for i,_:=range qtj {
+        res[i] = make(chan elements.ExtendedBlock)
+        
         go func(i int) {
             for p:=range qtj[i] {
                 nb:=make(elements.ByElementId, p.main.Len())
-                for i,q:=range p.qts {
-                    nb[i] = makeQtPacked(p.main.Element(i),q)
+                for j,q:=range p.qts {
+                    nb[j] = makeQtPacked(p.main.Element(j),q)
                 }
                 
-                addFunc(i,elements.MakeExtendedBlock(p.main.Idx(),nb, quadtree.Null,0,0,nil))
+                res[i] <- elements.MakeExtendedBlock(p.main.Idx(),nb, quadtree.Null,0,0,nil)
             }
-            wg.Done()
+            close(res[i])
         }(i)
     }
-    wg.Wait()
-    return nil
+    return res, nil
 }
 
                 

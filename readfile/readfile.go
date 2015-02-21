@@ -9,19 +9,19 @@ import (
     
     "os"
     //"io"
-    "sync"
+    //"sync"
     "strings"
-    
+    //"fmt"
 )
 
 func readBlocks(
-    blocks <-chan pbffile.FileBlock,
+    inblocks <-chan pbffile.FileBlock,
     readfn func(int, []byte, bool) (elements.ExtendedBlock,error),
     pc     int,
     ischange bool,
-    procfn func(int, elements.ExtendedBlock) error ) error {
+    outblocks chan <- elements.ExtendedBlock) error {
     
-    for bl := range blocks {
+    for bl := range inblocks {
         
         isc,ok := func(t pbffile.FileBlock) (bool,bool) {
             switch string(bl.BlockType()) {
@@ -35,131 +35,75 @@ func readBlocks(
             if err!=nil {
                 return err
             }
-            err = procfn(pc,dd)
-            if err!=nil {
-                return err
-            }
+            outblocks <- dd
         } else {
-            err := procfn(pc, elements.MakeExtendedBlock(bl.Idx(),nil,quadtree.Null,0,0,nil))
-            if err!=nil {
-                return err
-            }
+            outblocks <- elements.MakeExtendedBlock(bl.Idx(),nil,quadtree.Null,0,0,nil)
         }
     }
     return nil
 }
 
-func ReadFileBlocksFull(fn string) (<-chan elements.ExtendedBlock,error) {
+
+func MakeFileBlockChanSingle(fn string) (<-chan pbffile.FileBlock, bool, error) {
     fl,err := os.Open(fn)
-    if err!=nil {
-        return nil, err
-    }
+    if err!=nil { return nil,false,err}
     isc:=strings.HasSuffix(fn,"pbfc")
-    blocks := pbffile.ReadPbfFileBlocks(fl)
+    return pbffile.ReadPbfFileBlocksDefer(fl), isc, nil
+}
+
+func MakeFileBlockChanSplit(fn string, nc int) ([]<-chan pbffile.FileBlock, bool, error) {
+    fl,err := os.Open(fn)
+    if err!=nil { return nil,false,err}
+    isc:=strings.HasSuffix(fn,"pbfc")
+    return pbffile.ReadPbfFileBlocksDeferSplit(fl, nc), isc, nil
+}
+
+type ReadDataFunc func(int,[]byte,bool) (elements.ExtendedBlock, error)
+
+
+
+func ReadDataSingle(blocks <-chan pbffile.FileBlock, isc bool, readData ReadDataFunc) (<-chan elements.ExtendedBlock,error) {
+    
     res := make(chan elements.ExtendedBlock)
-    addto := func(p int, e elements.ExtendedBlock) error {
-        res <- e
-        return nil
-    }
+    
     go func() {
-        readBlocks(blocks, read.ReadExtendedBlock,0,isc,addto)
+        readBlocks(blocks, readData,0,isc,res)
         close(res)
-        fl.Close()
     }()
     return res, nil
 }
     
-func ReadFileBlocksMulti(fn string, nc int) (<-chan elements.ExtendedBlock,error) {
     
-    res := make(chan elements.ExtendedBlock)
-    addto := func(p int, e elements.ExtendedBlock) error {
-        res <- e
-        return nil
-    }
-    
-    go func() {
-        ProcessFileBlocksFullMulti(fn, addto, nc)
-        close(res)
-    }()
-    
-    return SortExtendedBlockChan(res),nil
-}
+func ReadDataMulti(blocks []<-chan pbffile.FileBlock, isc bool, readData ReadDataFunc ) ([]chan elements.ExtendedBlock,error) {
+    nc:=len(blocks)
+    res := make([]chan elements.ExtendedBlock, nc)
 
-func SortExtendedBlockChan(inc <-chan elements.ExtendedBlock) <-chan elements.ExtendedBlock {
-    idxc := make(chan utils.Idxer)
-    go func() {
-        for i := range inc {
-            idxc <- i
-        }
-        close(idxc)
-    }()
-    
-    res:=make(chan elements.ExtendedBlock)
-    go func() {
-        for i := range utils.SortIdxerChan(idxc) {
-            res <- i.(elements.ExtendedBlock)
-        }
-        close(res)
-    }()
-    return res
-}
-
-
-func ProcessFileBlocksMulti(fn string, proc func(int, elements.ExtendedBlock) error, nc int, readBlock func(int, []byte, bool) (elements.ExtendedBlock,error) ) error {
-    
-    
-    fl,err := os.Open(fn)
-    if err!=nil {
-        return err
-    }
-    isc:=strings.HasSuffix(fn,"pbfc")
-    //blocks := pbffile.ReadPbfFileBlocksMulti(fl,nc)
-    blocks := pbffile.ReadPbfFileBlocksDeferSplit(fl,nc)
-    
-    wg:=sync.WaitGroup{}
-    wg.Add(nc)
-    
-    for i:=0; i < nc; i++ {
+    for i,_:=range res {
+        res[i] = make(chan elements.ExtendedBlock)
         go func(i int) {
-            readBlocks(blocks[i], readBlock , i, isc,proc)
-            wg.Done()
+            //fmt.Println("call",i,"th readBlocks",blocks[i],readData,nc,isc,res[i])
+            readBlocks(blocks[i], readData, nc, isc, res[i])
+            //fmt.Println("finished",i)
+            close(res[i])
         }(i)
     }
-    wg.Wait()
-    fl.Close()
-    return nil
-}
     
-
-
-    
-
-func ReadFileBlocksSorted(fn string, nc int, procf func(string,func(p int, e elements.ExtendedBlock) error,int) error) (<-chan elements.ExtendedBlock,error) {
-    
-    
-    resp := make([]chan elements.ExtendedBlock, nc)
-    for i,_ := range resp {
-        resp[i] = make(chan elements.ExtendedBlock, 5)
-    }
-    
-    addto := func(p int, e elements.ExtendedBlock) error {
-        resp[p] <- e
-        return nil
-    }
-    
-    go func() {
-        procf(fn, addto, nc)
-        for _,r:= range resp {
-            close(r)
-        }
-    }()
-    
-    
-    return collect(resp,false),nil
-    //return SortExtendedBlockChan(res),nil
+    return res, nil
 }
 
-func collect(resp []chan elements.ExtendedBlock,msgs bool) <-chan elements.ExtendedBlock {
+
+func ReadDataMultiSorted(blocks []<-chan pbffile.FileBlock, isc bool, readData ReadDataFunc ) (<-chan elements.ExtendedBlock,error) {
+    dd,err := ReadDataMulti(blocks, isc, readData)
+    if err!=nil {
+        return nil,err
+    }
+    
+    return CollectExtendedBlockChans(dd, false),nil
+}
+
+
+
+func CollectExtendedBlockChans(resp []chan elements.ExtendedBlock,msgs bool) <-chan elements.ExtendedBlock {
     res := make(chan elements.ExtendedBlock)
     go func() {
         nc:=len(resp)
@@ -192,23 +136,64 @@ func collect(resp []chan elements.ExtendedBlock,msgs bool) <-chan elements.Exten
 }
 
 
-func ProcessFileBlocksFullMulti(fn string, proc func(int, elements.ExtendedBlock) error, nc int) error {
-    return ProcessFileBlocksMulti(fn,proc,nc,read.ReadExtendedBlock)
-}
-
-func ReadFileBlocksFullSorted(fn string, nc int) (<-chan elements.ExtendedBlock,error) {
-    return ReadFileBlocksSorted(fn,nc,ProcessFileBlocksFullMulti)
-}
-
-
-func ProcessFileBlocksDataMulti(
-    fn string, proc func(int, elements.ExtendedBlock) error,
-    nc int, nn, ww, rr bool) error {
-    
-    rof := func(idx int, bl []byte, isc bool) (elements.ExtendedBlock,error) {
-        return read.ReadObjsData(idx,bl,nn,ww,rr)
+func ReadSomeElements(nodes bool, ways bool, relations bool) ReadDataFunc {
+    return func(idx int, bl []byte, isc bool) (elements.ExtendedBlock,error) {
+        return read.ReadObjsData(idx,bl,nodes,ways,relations)
     }
-    
-    return ProcessFileBlocksMulti(fn,proc,nc,rof)
 }
 
+func ReadSomeElementsMulti(fn string, nc int, nn, ww, rr bool) ([]chan elements.ExtendedBlock, error) {
+    blocks,isc,err := MakeFileBlockChanSplit(fn,nc)
+    if err!=nil { return nil,err }
+    
+    return ReadDataMulti(blocks,isc, ReadSomeElements(nn,ww,rr))
+}
+
+func ReadSomeElementsMultiSorted(fn string, nc int, nn, ww, rr bool) (<-chan elements.ExtendedBlock, error) {
+    blocks,isc,err := MakeFileBlockChanSplit(fn,nc)
+    if err!=nil { return nil,err }
+    
+    return ReadDataMultiSorted(blocks,isc, ReadSomeElements(nn,ww,rr))
+}
+
+
+func ReadExtendedBlock(fn string) (<-chan elements.ExtendedBlock, error) {
+    blocks,isc,err := MakeFileBlockChanSingle(fn)
+    if err!=nil { return nil,err }
+    
+    return ReadDataSingle(blocks, isc, read.ReadExtendedBlock)
+}
+
+func ReadExtendedBlockMulti(fn string, nc int) ([]chan elements.ExtendedBlock, error) {
+    blocks,isc,err := MakeFileBlockChanSplit(fn,nc)
+    if err!=nil { return nil,err }
+    
+    return ReadDataMulti(blocks,isc, read.ReadExtendedBlock)
+}
+
+
+func ReadExtendedBlockMultiSorted(fn string, nc int) (<-chan elements.ExtendedBlock, error) {
+    blocks,isc,err := MakeFileBlockChanSplit(fn,nc)
+    if err!=nil { return nil,err }
+    
+    return ReadDataMultiSorted(blocks,isc, read.ReadExtendedBlock)
+}
+
+
+func SortExtendedBlockChan(inc <-chan elements.ExtendedBlock) <-chan elements.ExtendedBlock {
+    idxc := make(chan utils.Idxer)
+    go func() {
+        for i := range inc {
+            idxc <- i
+        }
+        close(idxc)
+    }()
+    res:=make(chan elements.ExtendedBlock)
+    go func() {
+        for i := range utils.SortIdxerChan(idxc) {
+            res <- i.(elements.ExtendedBlock)
+        }
+        close(res)
+    }()
+    return res
+}

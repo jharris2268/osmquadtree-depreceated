@@ -456,11 +456,14 @@ func WriteFileBlocks(file io.WriteSeeker, inBlocks <-chan FileBlockWrite) (Block
 
 
 
-func ReadPbfFileBlocksDefer(file *os.File) <-chan FileBlock {
+func ReadPbfFileBlocksDefer(file io.ReadSeeker) <-chan FileBlock {
 	resA := make(chan FileBlock)
 	i := 0
 	go func() {
-		defer file.Close()
+		fc,ok := file.(io.ReadCloser)
+        if ok {
+            defer fc.Close()
+        }
 		for {
 			bl, err := readNextBlock(file, i)
 			i++
@@ -503,11 +506,14 @@ func (dfb *deferedFileBlock) BlockType() []byte   { return dfb.calc().BlockType(
 func (dfb *deferedFileBlock) BlockData() []byte   { return dfb.calc().BlockData() }
 
 
-func ReadPbfFileBlocksDeferPartial(file *os.File, locs []int64) <-chan FileBlock {
+func ReadPbfFileBlocksDeferPartial(file io.ReadSeeker, locs []int64) <-chan FileBlock {
 	resA := make(chan FileBlock)
 	//i := 0
 	go func() {
-		defer file.Close()
+		fc,ok := file.(io.ReadCloser)
+        if ok {
+            defer fc.Close()
+        }
 		for i,lc := range locs {
             _, err := file.Seek(lc,0)
             if err != nil {
@@ -534,14 +540,17 @@ func ReadPbfFileBlocksDeferPartial(file *os.File, locs []int64) <-chan FileBlock
 }
 
 
-func ReadPbfFileBlocksDeferSplitPartial(file *os.File, locs []int64, ns int) []<-chan FileBlock {
+func ReadPbfFileBlocksDeferSplitPartial(file io.ReadSeeker, locs []int64, ns int) []<-chan FileBlock {
 	resA := make([]chan FileBlock,ns)
     for i,_ := range resA {
         resA[i] = make(chan FileBlock)
     }
 	//i := 0
 	go func() {
-		defer file.Close()
+		fc,ok := file.(io.ReadCloser)
+        if ok {
+            defer fc.Close()
+        }
 		for i,lc := range locs {
             _, err := file.Seek(lc,0)
             if err != nil {
@@ -581,7 +590,7 @@ func ReadPbfFileBlocksDeferSplitPartial(file *os.File, locs []int64, ns int) []<
 }
 
 
-func ReadPbfFileBlockAtDefered(file *os.File, pos int64) (FileBlock, error) {
+func ReadPbfFileBlockAtDefered(file io.ReadSeeker, pos int64) (FileBlock, error) {
 	_, err := file.Seek(pos, 0)
 	if err != nil {
 		return nil, err
@@ -596,7 +605,7 @@ func ReadPbfFileBlockAtDefered(file *os.File, pos int64) (FileBlock, error) {
 
 
 
-func ReadPbfFileBlocksDeferSplit(file *os.File, ns int) []<-chan FileBlock {
+func ReadPbfFileBlocksDeferSplit(file io.ReadSeeker, ns int) []<-chan FileBlock {
     
 	resA := make([]chan FileBlock,ns)
     for i,_ := range resA {
@@ -604,7 +613,10 @@ func ReadPbfFileBlocksDeferSplit(file *os.File, ns int) []<-chan FileBlock {
     }
 	i := 0
 	go func() {
-		defer file.Close()
+		fc,ok := file.(io.ReadCloser)
+        if ok {
+            defer fc.Close()
+        }
 		for {
 			bl, err := readNextBlock(file, i)
 			i++

@@ -1,13 +1,8 @@
 package change
 
 import (
-	//"fmt"
-
-	//"github.com/jharris2268/osmquadtree/read"
-	//"github.com/jharris2268/osmquadtree/quadtree"
 	"github.com/jharris2268/osmquadtree/elements"
-    "sync"
-    //"fmt"
+    
 )
 
 type origChangePair struct {
@@ -59,7 +54,7 @@ func mergeOrigChange(idx int, orig elements.ExtendedBlock, chg elements.Extended
 	return elements.MakeExtendedBlock(idx, objects, orig.Quadtree(), 0, chg.EndDate(), orig.Tags())
 }
 
-func MergeOrigAndChange(orig <-chan elements.ExtendedBlock, cbs <-chan elements.ExtendedBlock,  nc int, proc func(int, elements.ExtendedBlock) error) error {
+func MergeOrigAndChange(orig <-chan elements.ExtendedBlock, cbs <-chan elements.ExtendedBlock,  nc int) ([]chan elements.ExtendedBlock, error) {
 
     pp := make([]chan origChangePair, nc)
     for i,_:=range pp {
@@ -102,22 +97,19 @@ func MergeOrigAndChange(orig <-chan elements.ExtendedBlock, cbs <-chan elements.
         }
 	}()
 
-	//merged := make(chan elements.ExtendedBlock)
-	//go func() {
-    wg:=sync.WaitGroup{}
-    for i:=0; i < nc; i++ {
-        wg.Add(1)
+    res := make([]chan elements.ExtendedBlock, nc)
+    for i,_ := range res {
+        res[i] = make(chan elements.ExtendedBlock)
         go func(i int) {
             for ocp := range pp[i] {
                 
                 //fmt.Println(ocp.idx,ocp.orig,ocp.chg)
                 rr:=mergeOrigChange(ocp.idx,ocp.orig, ocp.chg)
-                //fmt.Println(ocp.idx,rr)
-                proc(i,rr)
+                res[i] <- rr
             }
-            wg.Done()
+            close(res[i])
         }(i)
     }
-    wg.Wait()
-	return nil
+    
+	return res, nil
 }

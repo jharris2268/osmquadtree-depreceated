@@ -211,80 +211,81 @@ func GenerateGeometries(
     makeInChan func()<-chan elements.ExtendedBlock,
     fbx *quadtree.Bbox,
     tagsFilter map[string]TagTest,
-    recalc bool, msgs bool)  func(func(int,elements.ExtendedBlock) error) error {
+    recalc bool, msgs bool)  (<-chan elements.ExtendedBlock, error) {
 
+      
+    A := makeInChan()
+        
+    B := AddWayCoords(A,fbx)
+    var C <-chan elements.ExtendedBlock
     
-    df := func(add func(int,elements.ExtendedBlock) error) error {
+    if _,ok := tagsFilter["parent_highway"]; ok {
+        C = AddNodeParent(B,"highway","highway","parent_highway")
+    } else {
+        println("skip parent_highway")
+        C=B
+    }
+    var D <-chan elements.ExtendedBlock
+    if _,ok := tagsFilter["min_admin_level"]; ok {
         
-        A := makeInChan()
-            
-        B := AddWayCoords(A,fbx)
-        var C <-chan elements.ExtendedBlock
+        D = AddRelationRange(C, hasTags(map[string]string{"boundary":"adminstrative","type":"boundary"}),"admin_level", AdminLevels)
+    } else {
+        println("skip admin_level")
+        D=C
+    }
+    var D2 <-chan elements.ExtendedBlock
+    if _,ok := tagsFilter["bus_routes"]; ok {
         
-        if _,ok := tagsFilter["parent_highway"]; ok {
-            C = AddNodeParent(B,"highway","highway","parent_highway")
-        } else {
-            println("skip parent_highway")
-            C=B
+        D2 = AddRelationRange(D, hasTags(map[string]string{"type":"route","route":"bus"}),"ref", BusRouteList)
+    } else {
+        println("skip bus_routes")
+        D2=D
+    }
+    
+    E := MakeGeometries(D2, tagsFilter)
+    
+    hasArea:=false
+    for _,t:=range tagsFilter {
+        if t.IsPoly=="yes" {
+            hasArea=true
         }
-        var D <-chan elements.ExtendedBlock
-        if _,ok := tagsFilter["min_admin_level"]; ok {
-            
-            D = AddRelationRange(C, hasTags(map[string]string{"boundary":"adminstrative","type":"boundary"}),"admin_level", AdminLevels)
-        } else {
-            println("skip admin_level")
-            D=C
-        }
-        var D2 <-chan elements.ExtendedBlock
-        if _,ok := tagsFilter["bus_routes"]; ok {
-            
-            D2 = AddRelationRange(D, hasTags(map[string]string{"type":"route","route":"bus"}),"ref", BusRouteList)
-        } else {
-            println("skip bus_routes")
-            D2=D
-        }
-        
-        E := MakeGeometries(D2, tagsFilter)
-        
-        hasArea:=false
-        for _,t:=range tagsFilter {
-            if t.IsPoly=="yes" {
-                hasArea=true
-            }
-        }
-        var F <-chan elements.ExtendedBlock
-        if hasArea {
-            F = HandleRelations(E, tagsFilter)
-        } else {
-            println("skip relations")
-            Ff := make(chan elements.ExtendedBlock)
-            go func() {
-                for b:=range E {
-                    nb := make(elements.ByElementId,0,b.Len())
-                    for i:=0; i < b.Len();i++ {
-                        e:=b.Element(i)
-                        if e.Type()==elements.Geometry {
-                            if IsFeature(e.(elements.FullElement).Tags(),tagsFilter) {
-                                nb=append(nb,e)
-                            }
+    }
+    var F <-chan elements.ExtendedBlock
+    if hasArea {
+        F = HandleRelations(E, tagsFilter)
+    } else {
+        println("skip relations")
+        Ff := make(chan elements.ExtendedBlock)
+        go func() {
+            for b:=range E {
+                nb := make(elements.ByElementId,0,b.Len())
+                for i:=0; i < b.Len();i++ {
+                    e:=b.Element(i)
+                    if e.Type()==elements.Geometry {
+                        if IsFeature(e.(elements.FullElement).Tags(),tagsFilter) {
+                            nb=append(nb,e)
                         }
                     }
-                    if len(nb)>0 {
-                        Ff <- elements.MakeExtendedBlock(b.Idx(),nb,b.Quadtree(),b.StartDate(),b.EndDate(),nil)
-                    }
                 }
-                close(Ff)
-            }()
-            F = Ff
-        }
+                if len(nb)>0 {
+                    Ff <- elements.MakeExtendedBlock(b.Idx(),nb,b.Quadtree(),b.StartDate(),b.EndDate(),nil)
+                }
+            }
+            close(Ff)
+        }()
+        F = Ff
+    }
+    
+    result := make(chan elements.ExtendedBlock)
+    
+    go func() {
         
+    
         j:=0
         var b elements.ExtendedBlock
         for b = range F {
             b.SetIdx(j)
-            if b.StartDate()!=0 || (msgs && (b.Idx() % 1271)==0) {
-                fmt.Printf("%-6d %s %s\n",b.Idx(),b,utils.MemstatsStr())
-            }
+            
             if recalc {
                 for i:=0; i < b.Len(); i++ {
                     fe:=b.Element(i).(Geometry)
@@ -293,15 +294,12 @@ func GenerateGeometries(
                 }
             }
             
-            add(0, b)
+            result <- b
             j++
         }
-        if b!=nil {
-            if b.StartDate()!=0 || (msgs && (b.Idx() % 1271)!=0) {
-                fmt.Printf("%-6d %s %s\n",b.Idx(),b,utils.MemstatsStr())
-            }
-        }
-        return nil
-    }
-    return df
+        close(result)
+    }()
+    
+    return result,nil
+        
 }

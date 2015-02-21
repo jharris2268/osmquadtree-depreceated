@@ -89,6 +89,47 @@ func PairObjs(lhs elements.Block, rhs elements.Block) func() ElementPair {
     }
 }
 
+func PairObjsChan(lhs <-chan elements.Element, rhs <-chan elements.Element) <-chan ElementPair {
+	
+    res:=make(chan ElementPair)
+    
+    go func() {
+        
+        a,aok := <-lhs 
+        b,bok := <-rhs 
+        
+        for aok || bok {
+            if !aok {
+                res <- ElementPair{nil,b}
+                b,bok = <-rhs
+                continue
+            }
+            if !bok {
+                res <- ElementPair{a,nil}
+                a,aok = <-lhs
+                continue
+            }
+            
+            switch objCmp(a,b) {
+                case 0:
+                    
+                    res <- ElementPair{a,b}
+                    a,aok = <-lhs
+                    b,bok = <-rhs
+                    
+                case -1:
+                    res <- ElementPair{a,nil}
+                    a,aok = <-lhs
+                case 1:
+                    res <- ElementPair{nil,b}
+                    b,bok = <-rhs
+            }
+        }
+        close(res)
+    }()
+    return res
+}
+
 func mergeChangeObjs_(lhs elements.Block, rhs elements.Block) elements.ByElementId {
 	aa := make(elements.ByElementId, 0, lhs.Len()+rhs.Len())
     ss := PairObjs(lhs,rhs)

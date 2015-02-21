@@ -55,6 +55,16 @@ func addFullBlock(bl elements.ExtendedBlock, idxoff int, isc bool, bh []byte) (u
     return &idxData{bl.Idx()-idxoff, b},nil
 }
 
+func addOrigBlock(bl elements.ExtendedBlock, bh []byte) (utils.Idxer,error) {
+    a,err := write.WriteExtendedBlock(bl,false,false)
+    if err!=nil { return nil,err }
+    
+    b,err:=pbffile.PreparePbfFileBlock(bh,a,true)
+    if err!=nil { return nil,err }
+    return &idxData{bl.Idx(),b},err
+}
+
+
 func WritePbfFile(inc <-chan elements.ExtendedBlock, outfn string, idx bool, isc bool) (write.BlockIdxWrite,error) {
     outf,err:=os.Create(outfn)
     if err!=nil {
@@ -63,7 +73,7 @@ func WritePbfFile(inc <-chan elements.ExtendedBlock, outfn string, idx bool, isc
     defer outf.Close()
     
     if !idx {
-        return WritePbfIndexed(inc, outf, nil, idx, isc)
+        return WritePbfIndexed(inc, outf, nil, idx, isc, false)
     }
     
     tf,err := ioutil.TempFile("","osmquadtree.writefile.tmp")
@@ -71,15 +81,17 @@ func WritePbfFile(inc <-chan elements.ExtendedBlock, outfn string, idx bool, isc
         return nil,err
     }
         
+    
     defer func() {
         tf.Close()
         os.Remove(tf.Name())
     }()
         
-    return WritePbfIndexed(inc, outf, tf, idx, isc)
+    return WritePbfIndexed(inc, outf, tf, idx, isc, false)
+    
 }
     
-func WritePbfIndexed(inc <-chan elements.ExtendedBlock, outf io.Writer, tf io.ReadWriter, idx bool, isc bool) (write.BlockIdxWrite,error) {
+func WritePbfIndexed(inc <-chan elements.ExtendedBlock, outf io.Writer, tf io.ReadWriter, idx bool, isc bool, plain bool) (write.BlockIdxWrite,error) {
     
     mt := sync.Mutex{}
     qm := map[int]quadtree.Quadtree{}
@@ -91,8 +103,19 @@ func WritePbfIndexed(inc <-chan elements.ExtendedBlock, outf io.Writer, tf io.Re
     }
     
     if !idx {
+        if plain {
+            addBl = func(bl elements.ExtendedBlock, i int) (utils.Idxer,error) {
+                return addOrigBlock(bl,[]byte("OSMData"))
+            }
+        }
+        
         ii,err := WriteBlocks(inc,outf,addBl,isc)
+        
         if err!=nil { return nil,err}
+        if plain {
+            return nil,nil
+        }
+        
         sort.Sort(blockIdx(ii))
         for i,_:=range ii {
             
@@ -112,8 +135,8 @@ func WritePbfIndexed(inc <-chan elements.ExtendedBlock, outf io.Writer, tf io.Re
     }
     
     tfs,ok := tf.(interface{
-        Sync() bool
-        Seek(int,int)
+        Sync() error
+        Seek(int64,int) (int64,error)
     })
     if ok {
         
@@ -121,9 +144,12 @@ func WritePbfIndexed(inc <-chan elements.ExtendedBlock, outf io.Writer, tf io.Re
         tfs.Sync()
         tfs.Seek(0,0)
     } else {
+        fmt.Println("tempfile not a Seeker...")
         tfr, ok := tf.(interface{ Reset() })
         if ok {
             tfr.Reset()
+        } else {
+            fmt.Println("tempfile not a Reseter...")
         }
     }
     
@@ -145,6 +171,8 @@ func WritePbfIndexed(inc <-chan elements.ExtendedBlock, outf io.Writer, tf io.Re
     
     err = pbffile.WriteFileBlockAtEnd(outf,dd)
     if err!=nil { return nil,err }
+    
+    
     
     ll,err := io.Copy(outf, tf)
     if err!=nil {

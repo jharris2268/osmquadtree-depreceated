@@ -9,7 +9,7 @@ import (
     
     "os"
     "strings"
-    "sync"
+    //"sync"
     "errors"
     //"fmt"
 )
@@ -19,6 +19,7 @@ func GetHeaderBlock(fn string) (*os.File, *read.HeaderBlock,error) {
     if err!=nil {
         return nil,nil,err
     }
+    
     bl,err := pbffile.ReadPbfFileBlockAt(fl,0)
     if err!=nil {
         return nil,nil,err
@@ -38,34 +39,19 @@ func GetHeaderBlock(fn string) (*os.File, *read.HeaderBlock,error) {
     return fl,hb,nil
 }
 
-func ProcessFileBlocksFullMultiPartial(fn string, locs []int64, proc func(int, elements.ExtendedBlock) error, nc int) error {
+
+func MakeFileBlockChanSplitPartial(fn string, nc int, locs []int64) ([]<-chan pbffile.FileBlock, bool, error) {
     fl,err := os.Open(fn)
-    if err!=nil {
-        return err
-    }
+    if err!=nil { return nil,false,err}
     isc:=strings.HasSuffix(fn,"pbfc")
-    //blocks := pbffile.ReadPbfFileBlocksMulti(fl,nc)
-    
-    blocks := pbffile.ReadPbfFileBlocksDeferPartial(fl, locs)
-    
-    wg:=sync.WaitGroup{}
-    wg.Add(nc)
-        
-    for i:=0; i < nc; i++ {
-        go func(i int) {
-            readBlocks(blocks, read.ReadExtendedBlock, i, isc,proc)
-            wg.Done()
-        }(i)
-    }
-    wg.Wait()
-    fl.Close()
-    return nil
+    return pbffile.ReadPbfFileBlocksDeferSplitPartial(fl, locs, nc), isc, nil
 }
 
-func ProcessFileBlocksPartialQts(fn string, passQt func(quadtree.Quadtree) bool, proc func(int, elements.ExtendedBlock) error, nc int) error {
-    fl,hb,err := GetHeaderBlock(fn)
+func getPartialLocs(fn string, passQt func(quadtree.Quadtree) bool) ([]int64, error) {
+    
+    _,hb,err := GetHeaderBlock(fn)
     if err!=nil {
-        return err
+        return nil,err
     }
     locs:=make([]int64,0,hb.Index.Len())
     for i:=0; i < hb.Index.Len(); i++ {
@@ -74,30 +60,21 @@ func ProcessFileBlocksPartialQts(fn string, passQt func(quadtree.Quadtree) bool,
             locs=append(locs, hb.Index.Filepos(i))
         }
     }
-    
-    isc:=strings.HasSuffix(fn,"pbfc")
-    //blocks := pbffile.ReadPbfFileBlocksMulti(fl,nc)
-    
-    //println(fn,isc,len(locs))
-    
-    blocks := pbffile.ReadPbfFileBlocksDeferSplitPartial(fl, locs,nc)
-    
-    wg:=sync.WaitGroup{}
-    wg.Add(nc)
-        
-    for i:=0; i < nc; i++ {
-        go func(i int) {
-            readBlocks(blocks[i], read.ReadExtendedBlock, i, isc, proc)
-            wg.Done()
-        }(i)
-    }
-    wg.Wait()
-    fl.Close()
-    return nil
+    return locs,nil
 }
 
-func MakeProcessFileBlocksPartialQts(passQt func(quadtree.Quadtree) bool) func(string,func(p int, e elements.ExtendedBlock) error,int) error {
-    return func(fn string, proc func(int, elements.ExtendedBlock) error, nc int) error {
-        return ProcessFileBlocksPartialQts(fn,passQt,proc,nc)
-    }
+func ReadExtendedBlockMultiSortedQts(fn string, nc int, passQt func(quadtree.Quadtree) bool) (<-chan elements.ExtendedBlock, error) {
+    
+    locs,err := getPartialLocs(fn, passQt)
+    if err!=nil { return nil,err }
+    return ReadExtendedBlockMultiSortedPartial(fn,nc,locs)
 }
+
+
+func ReadExtendedBlockMultiSortedPartial(fn string, nc int, locs []int64) (<-chan elements.ExtendedBlock, error) {    
+    blocks,isc,err := MakeFileBlockChanSplitPartial(fn,nc,locs)
+    if err!=nil { return nil,err }
+    
+    return ReadDataMultiSorted(blocks,isc, read.ReadExtendedBlock)
+}
+

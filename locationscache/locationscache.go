@@ -208,7 +208,7 @@ type kbb struct {
 }
 
 func MakeLocationsCache(
-        dataFunc func(func(int, elements.ExtendedBlock) error) error,
+        inputChans []chan elements.ExtendedBlock,
         inputfn string, prfx string, enddate int64, state int64) error {
 	
 	outc := make(chan kbb)
@@ -224,64 +224,67 @@ func MakeLocationsCache(
 		qtcwg.Done()
 	}()
 
-    vvs := make([]map[int64]*tvs, 4)
-    for i,_:=range vvs {
-        vvs[i]=map[int64]*tvs{}
-    }
-
-	addBlock := func(j int, bl elements.ExtendedBlock) error {
-        
-        qt := int64(bl.Quadtree())
-        if qt<0 {
-            return nil
-        }
-        qtc <- qt
-        for i := 0; i < bl.Len(); i++ {
-            o := bl.Element(i)
-            id := int64(o.Type()) << 59
-            id |= int64(o.Id())
-
-            oi := id >> 25
-            _, ok := vvs[j][oi]
-            if !ok {
-                vvs[j][oi] = &tvs{make([]tp, 128*1024), 0}
-            }
-            vs := vvs[j][oi]
-            vs.t[vs.l].i = id
-            vs.t[vs.l].b = qt
-            vs.l += 1
-
-            if vs.l == 128*1024 {
-                sort.Sort(vs)
-                b := vs.pack()
-                bp, _ := utils.Compress(b)
-                outc <- kbb{oi, len(b), bp}
-                vs.l = 0
-                b = nil
-            }
-            vvs[j][oi] = vs
-        }
-        return nil
-    }
     
     go func() {
-        err := dataFunc(addBlock)
-        if err!=nil {
-            panic(err.Error())
-        }
+
+        wg:=sync.WaitGroup{}
+        wg.Add(len(inputChans))
+        //fmt.Println("have",len(inputChans),"input chans")
+        for _,inc:=range inputChans {
+            go func(inc chan elements.ExtendedBlock) {
         
-        for _,vv := range vvs {
-            for oi, vs := range vv {
-                if vs.l > 0 {
-                    sort.Sort(vs)
-                    b := vs.pack()
-                    bp, _ := utils.Compress(b)
-                    outc <- kbb{oi, len(b), bp}
+                vvs := map[int64]*tvs{}
+                for bl:=range inc {
+                    
+                    qt := int64(bl.Quadtree())
+                    if qt<0 {
+                        //panic("block with qt < 0??")
+                        fmt.Println(bl.Idx(),"??",bl)
+                        continue
+                    }
+                    qtc <- qt
+                    for i := 0; i < bl.Len(); i++ {
+                        o := bl.Element(i)
+                        id := int64(o.Type()) << 59
+                        id |= int64(o.Id())
+
+                        oi := id >> 25
+                        _, ok := vvs[oi]
+                        if !ok {
+                            vvs[oi] = &tvs{make([]tp, 128*1024), 0}
+                        }
+                        vs := vvs[oi]
+                        vs.t[vs.l].i = id
+                        vs.t[vs.l].b = qt
+                        vs.l += 1
+
+                        if vs.l == 128*1024 {
+                            sort.Sort(vs)
+                            b := vs.pack()
+                            bp, _ := utils.Compress(b)
+                            outc <- kbb{oi, len(b), bp}
+                            vs.l = 0
+                            b = nil
+                        }
+                        vvs[oi] = vs
+                    }
                 }
-                delete(vv, oi)
-            }
-            
+                for oi, vs := range vvs {
+                    if vs.l > 0 {
+                        sort.Sort(vs)
+                        b := vs.pack()
+                        bp, _ := utils.Compress(b)
+                        outc <- kbb{oi, len(b), bp}
+                    }
+                    delete(vvs, oi)
+                }
+                
+                wg.Done()
+                
+            }(inc)
         }
+    
+        wg.Wait()
         close(outc)
 		close(qtc)
 		//println("done")
