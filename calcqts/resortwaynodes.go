@@ -30,7 +30,7 @@ func readWayNodes(infn string, nc int) (blocksort.AllocBlockStore, elements.Bloc
         
         if block==nil { return nil }
         
-        if (block.Idx()%1371)==0  {
+        if (block.Idx()%137)==0  {
             fmt.Printf("%8d %s\n",block.Idx(), block.String())
         }
         
@@ -280,7 +280,19 @@ func iterNodes(infn string) <-chan []nodeAndWays {
                 /*if (n.idx % 1381)==0 {
                     fmt.Printf("\rnodes %-8d: %-5d %10d %10d %10d",n.idx,len(n.nws),n.nws[0].id,n.nws[0].ln,n.nws[0].lt)
                 }*/
-                output <- n.nws
+                if len(n.nws)<3000 {   
+                    output <- n.nws
+                } else {
+                    for i := 0; i < len(n.nws); i+=3000 {
+                        j := i+3000
+                        if j>len(n.nws) {
+                            j=len(n.nws)
+                        }
+                        output <- n.nws[i:j]
+                        
+                    }
+                }
+                
             }
         }
         close(output)
@@ -316,8 +328,8 @@ func mergeNodeAndWayNodes(nodes <-chan []nodeAndWays, wayNodes <-chan nodeWaySli
 				for wayNodesOk && wayNodeBlock[wn].node < n.id {
 					println("?? missing node", wayNodeBlock[wn].node, "for", wayNodeBlock[wn].way, "[@", n.id,n.ln,n.lt, "]")
 					missingnodes++
-					if missingnodes == 10 {
-						panic("10 missings")
+					if missingnodes == 1000 {
+						panic("1000 missings")
 					}
 
 					wn++
@@ -405,10 +417,12 @@ func calcWayQts(infn string, abs blocksort.AllocBlockStore) (objQt, error) {
     }
     qts = expandWayBoxes(infn, abs, 4<<26, 1<<45).Qts(qts, 18, 0.05)
     */
-    mp := elements.Ref(10000)<<14
+    mp := elements.Ref(7000)<<14
     qts = expandWayBoxes(infn, abs, 0, mp).Qts(qts, 18, 0.05)
     debug.FreeOSMemory()
-    qts = expandWayBoxes(infn, abs, mp, 1<<45).Qts(qts, 18, 0.05)
+    qts = expandWayBoxes(infn, abs, mp, 2*mp).Qts(qts, 18, 0.05)
+    debug.FreeOSMemory()
+    qts = expandWayBoxes(infn, abs, 2*mp, 1<<45).Qts(qts, 18, 0.05)
     debug.FreeOSMemory()
     //utils.WriteMemProfile()
     
@@ -452,7 +466,7 @@ func findNodeQts(
 			}
 			if numNode == nextP {
 				fmt.Printf("\rcalcNodeQts: %-8d // %-8d [%-10d [%-9d %-9d] w/ %-4d] %s", numNode, numWN, nw.id, nw.ln, nw.lt, len(nw.ways),utils.MemstatsStr())
-				nextP += 19523717
+				nextP += 1952371
 			}
 			numNode++
 			numWN += len(nw.ways)

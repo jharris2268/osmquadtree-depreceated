@@ -17,6 +17,7 @@ import (
 type idxData struct {
     i int
     d []byte
+    q quadtree.Quadtree
 }
 func (i *idxData) Idx() int { return i.i }
 
@@ -43,7 +44,7 @@ func addQtBlock(bl elements.ExtendedBlock, idxoff int) (utils.Idxer,error) {
     if err!=nil { return nil,err }
     b,err:=pbffile.PreparePbfFileBlock([]byte("OSMData"),a,true)
     if err!=nil { return nil,err }
-    return &idxData{bl.Idx()-idxoff, b},nil
+    return &idxData{bl.Idx()-idxoff, b, quadtree.Null},nil
 }
 
 func addFullBlock(bl elements.ExtendedBlock, idxoff int, isc bool, bh []byte) (utils.Idxer,error) {
@@ -52,7 +53,7 @@ func addFullBlock(bl elements.ExtendedBlock, idxoff int, isc bool, bh []byte) (u
     
     b,err:=pbffile.PreparePbfFileBlock(bh,a,true)
     if err!=nil { return nil,err }
-    return &idxData{bl.Idx()-idxoff, b},nil
+    return &idxData{bl.Idx()-idxoff, b, bl.Quadtree()},nil
 }
 
 func addOrigBlock(bl elements.ExtendedBlock, bh []byte) (utils.Idxer,error) {
@@ -61,11 +62,11 @@ func addOrigBlock(bl elements.ExtendedBlock, bh []byte) (utils.Idxer,error) {
     
     b,err:=pbffile.PreparePbfFileBlock(bh,a,true)
     if err!=nil { return nil,err }
-    return &idxData{bl.Idx(),b},err
+    return &idxData{bl.Idx(),b, quadtree.Null},err
 }
 
 
-func WritePbfFile(inc <-chan elements.ExtendedBlock, outfn string, idx bool, isc bool) (write.BlockIdxWrite,error) {
+func WritePbfFile(inc <-chan elements.ExtendedBlock, outfn string, idx bool, isc bool, plain bool) (write.BlockIdxWrite,error) {
     outf,err:=os.Create(outfn)
     if err!=nil {
         return nil,err
@@ -73,7 +74,7 @@ func WritePbfFile(inc <-chan elements.ExtendedBlock, outfn string, idx bool, isc
     defer outf.Close()
     
     if !idx {
-        return WritePbfIndexed(inc, outf, nil, idx, isc, false)
+        return WritePbfIndexed(inc, outf, nil, idx, isc, plain)
     }
     
     tf,err := ioutil.TempFile("","osmquadtree.writefile.tmp")
@@ -87,18 +88,18 @@ func WritePbfFile(inc <-chan elements.ExtendedBlock, outfn string, idx bool, isc
         os.Remove(tf.Name())
     }()
         
-    return WritePbfIndexed(inc, outf, tf, idx, isc, false)
+    return WritePbfIndexed(inc, outf, tf, idx, isc, plain)
     
 }
     
 func WritePbfIndexed(inc <-chan elements.ExtendedBlock, outf io.Writer, tf io.ReadWriter, idx bool, isc bool, plain bool) (write.BlockIdxWrite,error) {
     
-    mt := sync.Mutex{}
-    qm := map[int]quadtree.Quadtree{}
+    //mt := sync.Mutex{}
+    //qm := map[int]quadtree.Quadtree{}
     addBl := func(bl elements.ExtendedBlock,i int) (utils.Idxer,error) {
-        mt.Lock()
-        qm[bl.Idx()] = bl.Quadtree()
-        mt.Unlock()
+        //mt.Lock()
+        //qm[bl.Idx()] = bl.Quadtree()
+        //mt.Unlock()
         return addFullBlock(bl,i,isc,[]byte("OSMData"))
     }
     
@@ -120,7 +121,7 @@ func WritePbfIndexed(inc <-chan elements.ExtendedBlock, outf io.Writer, tf io.Re
         for i,_:=range ii {
             
             
-            ii[i].Quadtree=qm[i]
+            //ii[i].Quadtree=qm[i]
             ii[i].Isc=isc
         }
         
@@ -157,7 +158,7 @@ func WritePbfIndexed(inc <-chan elements.ExtendedBlock, outf io.Writer, tf io.Re
     for i,_:=range ii {
         
         
-        ii[i].Quadtree=qm[i]
+        //ii[i].Quadtree=qm[i]
         ii[i].Isc=isc
     }
     
@@ -243,16 +244,16 @@ func WriteBlocks(inc <-chan elements.ExtendedBlock,
         close(outc)
     }()
     
-    items:=make([]IdxItem, 0, 400000)
+    items:=make([]IdxItem, 0, 450000)
     for p:=range utils.SortIdxerChan(outc) {
-        d:=p.(*idxData).d
-        if d!=nil {
+        d:=p.(*idxData)
+        if d.d!=nil {
             
-            pbffile.WriteFileBlockAtEnd(outf,d)
-            items=append(items, IdxItem{p.Idx(),quadtree.Null,int64(len(d)),false})
+            pbffile.WriteFileBlockAtEnd(outf,d.d)
+            items=append(items, IdxItem{p.Idx(),d.q,int64(len(d.d)),false})
         } else {
             println("null data @", p.Idx())
-            items=append(items, IdxItem{p.Idx(),quadtree.Null,int64(0),false})
+            items=append(items, IdxItem{p.Idx(),d.q,int64(0),false})
         }
     }
     

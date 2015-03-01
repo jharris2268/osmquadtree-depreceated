@@ -55,7 +55,12 @@ type ep struct {
 
 func sortAndGroupTiles(toSort <-chan elements.ExtendedBlock, groupSize int, endDate elements.Timestamp, nc int) ([]chan elements.ExtendedBlock, error) {
     sorted := readfile.SortExtendedBlockChan(toSort)
+    
+    return GroupTiles(sorted,groupSize,endDate,nc)
+}
 
+func GroupTiles(sorted <-chan elements.ExtendedBlock, groupSize int, endDate elements.Timestamp, nc int) ([]chan elements.ExtendedBlock, error) {
+    
     res := make([]chan elements.ExtendedBlock, nc)
     for i,_:=range res {
         res[i] = make(chan elements.ExtendedBlock)
@@ -68,7 +73,7 @@ func sortAndGroupTiles(toSort <-chan elements.ExtendedBlock, groupSize int, endD
         
         ii := 0
         for bl := range sorted {
-           
+
             j := 0
             for j < bl.Len() {
                 

@@ -100,15 +100,40 @@ func AddQts(
                 }
                 e:=bl.Element(i)
                 q:=qtb.Element(qti)
+                
+                if e.Type()<q.Type() || e.Id()<q.Id() {
+                    fmt.Printf("No qt for object %s,{%s}\n", e, q)
+                    pp.qts[i] = quadtree.Null
+                } else if e.Type()>q.Type() || e.Id()>q.Id() {
+                    
+                    for ok && (e.Type()>q.Type() || e.Id()>q.Id()) {
+                        fmt.Printf("no object for qt %s{%s}\n", q, e)
+                        qti++
+                        for ok && qti==qtb.Len() {
+                            qtb,ok = <- qts
+                            qti=0
+                        }
+                        if ok {
+                            q = qtb.Element(qti)
+                        } 
+                    }
+                } else {
+                    /*
+                    
+                                                
                 if e.Type()!=q.Type() || e.Id()!=q.Id() {
+                                       
+                    
                     panic("out of sync")
+                }*/
+                    qq,ok:=q.(interface{Quadtree() quadtree.Quadtree})
+                    if !ok {
+                        panic("no quadtree")
+                    }
+                    pp.qts[i] = qq.Quadtree()
+                    qti++
                 }
-                qq,ok:=q.(interface{Quadtree() quadtree.Quadtree})
-                if !ok {
-                    panic("no quadtree")
-                }
-                pp.qts[i] = qq.Quadtree()
-                qti++
+                
             }
             //println(pp.main.Idx(),pp.main.Len(),len(pp.qts))
             qtj[bl.Idx()%nc] <- pp
@@ -134,13 +159,22 @@ func AddQts(
         
         go func(i int) {
             for p:=range qtj[i] {
-                nb:=make(elements.ByElementId, p.main.Len())
+                nb:=make(elements.ByElementId, 0, p.main.Len())
                 for j,q:=range p.qts {
-                    nb[j] = makeQtPacked(p.main.Element(j),q)
+                    e:=p.main.Element(j)
+                    
+                    //if e.Type()!=elements.Node {
+                    if q == quadtree.Null {
+                        fmt.Println("skip",e,q)
+                    } else {
+                        nb = append(nb, makeQtPacked(e,q))
+                    }
                 }
-                
-                res[i] <- elements.MakeExtendedBlock(p.main.Idx(),nb, quadtree.Null,0,0,nil)
+                if len(nb)>0 {
+                    res[i] <- elements.MakeExtendedBlock(p.main.Idx(),nb, quadtree.Null,0,0,nil)
+                }
             }
+            fmt.Println("close chan",i,"/",len(res))
             close(res[i])
         }(i)
     }

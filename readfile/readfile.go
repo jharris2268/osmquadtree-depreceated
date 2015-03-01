@@ -180,6 +180,16 @@ func ReadExtendedBlockMultiSorted(fn string, nc int) (<-chan elements.ExtendedBl
 }
 
 
+func ReadQtsMulti(fn string, nc int) ([]chan elements.ExtendedBlock, error) {
+    blocks,isc,err := MakeFileBlockChanSplit(fn,nc)
+    if err!=nil { return nil,err }
+    
+    return ReadDataMulti(blocks,isc, read.ReadQts)
+}
+
+
+
+
 func SortExtendedBlockChan(inc <-chan elements.ExtendedBlock) <-chan elements.ExtendedBlock {
     idxc := make(chan utils.Idxer)
     go func() {

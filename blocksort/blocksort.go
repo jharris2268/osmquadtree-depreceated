@@ -203,8 +203,12 @@ func SortElementsByAlloc(
     }
     
     go func() {
-        SortByTile(inChans,addFunc,nc,outputFunc,abs)
-        for _,r:=range res {
+        err:=SortByTile(inChans,addFunc,nc,outputFunc,abs)
+        if err!=nil {
+            fmt.Println("SortByTile error:", err.Error())
+        }
+        for i,r:=range res {
+            fmt.Println("close chan",i,"/",len(res))
             close(r)
         }
     }()

@@ -8,6 +8,8 @@ import (
 	"github.com/jharris2268/osmquadtree/elements"
 	"sort"
 	"sync"
+    
+    "runtime/debug"
 )
 
 type refSlice []elements.Ref
@@ -32,10 +34,12 @@ type objQt interface {
 const tileLen = 1 << 14
 var tileSz = elements.Ref(tileLen)
 
-type qtTile []quadtree.Quadtree
+type qtTile struct {
+    t [tileLen]int64
+}
 
 type objQtImpl struct {
-	tt map[elements.Ref]qtTile
+	tt map[elements.Ref]*qtTile
 	ln int
 }
 
@@ -45,38 +49,40 @@ func (oqi *objQtImpl) Get(id elements.Ref) quadtree.Quadtree {
         //println("??",id,k,ok)
 		return quadtree.Null
 	}
-    r:=oqi.tt[k][id%tileSz] - 1
+    r:=oqi.tt[k].t[id%tileSz] - 1
     /*if r<0 {
         println("!!",id,k,id%tileSz)
     }*/
-	return r
+	return quadtree.Quadtree(r)
 }
 
 func (oqi *objQtImpl) Set(id elements.Ref, qt quadtree.Quadtree) {
 	k := id / tileSz
 	if _, ok := oqi.tt[k]; !ok {
-		oqi.tt[k] = make(qtTile, tileSz)
+		//oqi.tt[k] = make(qtTile, tileSz)
+        oqi.tt[k] = &qtTile{}
 	}
-	c := oqi.tt[k][id%tileSz]
+	c := oqi.tt[k].t[id%tileSz]
 	if c == 0 {
 		oqi.ln++
 	}
-	oqi.tt[k][id%tileSz] = qt + 1
+	oqi.tt[k].t[id%tileSz] = int64(qt) + 1
 }
 
 func (oqi *objQtImpl) Expand(id elements.Ref, qt quadtree.Quadtree) {
 	k := id / tileSz
 	if _, ok := oqi.tt[k]; !ok {
-		oqi.tt[k] = make(qtTile, tileSz)
+		//oqi.tt[k] = make(qtTile, tileSz)
+        oqi.tt[k] = &qtTile{}
 	}
-	c := oqi.tt[k][id%tileSz] - 1
+	c := oqi.tt[k].t[id%tileSz] - 1
 	if c < 0 {
 		if c == 0 {
 			oqi.ln++
 		}
-		oqi.tt[k][id%tileSz] = qt + 1
+		oqi.tt[k].t[id%tileSz] = int64(qt) + 1
 	} else {
-		oqi.tt[k][id%tileSz] = qt.Common(c) + 1
+		oqi.tt[k].t[id%tileSz] = int64(qt.Common(quadtree.Quadtree(c)) + 1)
 	}
 
 }
@@ -98,7 +104,7 @@ func (oqi *objQtImpl) ObjsIter(objT elements.ElementType, blckSz int) <-chan ele
 	go func() {
 		curr := make(elements.ByElementId, 0, blckSz)
 		for _, k := range kk {
-			t := oqi.tt[k]
+			t := oqi.tt[k].t
 			ks := k * tileSz
 			for i, q := range t {
 				if q != 0 {
@@ -106,7 +112,7 @@ func (oqi *objQtImpl) ObjsIter(objT elements.ElementType, blckSz int) <-chan ele
 						nnuls++
 						q = 1
 					}
-					curr = append(curr, read.MakeObjQt(objT, elements.Ref(i)+ks, q-1))
+					curr = append(curr, read.MakeObjQt(objT, elements.Ref(i)+ks, quadtree.Quadtree(q-1)))
 					if len(curr) == blckSz {
 						res <- curr
 						curr = make(elements.ByElementId, 0, blckSz)
@@ -124,7 +130,7 @@ func (oqi *objQtImpl) ObjsIter(objT elements.ElementType, blckSz int) <-chan ele
 }
 
 func newObjQtImpl() objQt {
-	return &objQtImpl{map[elements.Ref]qtTile{}, 0}
+	return &objQtImpl{map[elements.Ref]*qtTile{}, 0}
 }
 
 type wayBbox interface {
@@ -201,7 +207,80 @@ func (wbi *wayBboxImpl) Get(id elements.Ref) quadtree.Bbox {
 	return quadtree.Bbox{int64(v[j]), int64(v[j+1]), int64(v[j+2]), int64(v[j+3])}
 }
 
+
+type wbt struct {
+    k elements.Ref
+    t *wayBboxTile
+}
+
+type qtt struct {
+    k elements.Ref
+    t *qtTile
+    l int
+}
+
 func (wbi *wayBboxImpl) Qts(rr objQt, md uint, buf float64) objQt {
+    r := rr.(*objQtImpl)
+    
+    wbc := make(chan wbt)
+    go func() {
+        z := 0
+        for k,v := range wbi.ts {
+            wbc <- wbt{k,v}
+            delete(wbi.ts, k)
+            z++
+            if (z%1271) == 0 {
+                debug.FreeOSMemory()
+            }
+        }
+        close(wbc)
+    }()
+    
+    qtc := make(chan qtt)
+    go func() {
+        wg:=sync.WaitGroup{}
+        wg.Add(4)    
+        for s := 0; s < 4; s++ {
+            go func() {
+                
+                for w := range wbc {
+                    ll := 0
+                    k := w.k
+                    v := w.t.n
+                    nv := &qtTile{}
+                    for i, _ := range nv.t {
+                        j := 4 * i
+                        //var err error
+                        if v[j] != mxInt32 {
+                            bx := quadtree.Bbox{int64(v[j]), int64(v[j+1]), int64(v[j+2]), int64(v[j+3])}
+                            q,err := quadtree.Calculate(bx, buf, md)
+                            if err!=nil { panic(err.Error()) }
+                            nv.t[i] = int64(q+1)
+                            ll++
+                        }
+                    }
+                    qtc <- qtt{k,nv,ll}
+
+                }
+                wg.Done()
+            }()
+        }
+        wg.Wait()
+        close(qtc)
+    }()
+	
+    for q := range qtc {
+        r.tt[q.k] = q.t
+        r.ln += q.l
+    }
+        
+    return r
+}
+            
+    
+
+
+func (wbi *wayBboxImpl) Qtsz(rr objQt, md uint, buf float64) objQt {
 	r := rr.(*objQtImpl)
 
 	qc := make(chan elements.Ref)
@@ -214,20 +293,21 @@ func (wbi *wayBboxImpl) Qts(rr objQt, md uint, buf float64) objQt {
 	//println(len(r.tt))
 	ss := sync.Mutex{}
 	rc := make(chan int)
+    zz:=0
 	for s := 0; s < 4; s++ {
 		go func() {
 			ll := 0
 			for k := range qc {
 				v := wbi.ts[k].n
-				nv := make(qtTile, tileSz)
-				for i, _ := range nv {
+				nv := &qtTile{} //make(qtTile, tileSz)
+				for i, _ := range nv.t {
 					j := 4 * i
-                    var err error
+                    //var err error
 					if v[j] != mxInt32 {
 						bx := quadtree.Bbox{int64(v[j]), int64(v[j+1]), int64(v[j+2]), int64(v[j+3])}
-						nv[i],err = quadtree.Calculate(bx, buf, md)
+						q,err := quadtree.Calculate(bx, buf, md)
                         if err!=nil { panic(err.Error()) }
-                        nv[i]+=1
+                        nv.t[i] = int64(q)+1
 						ll++
 					}
 				}
@@ -237,6 +317,10 @@ func (wbi *wayBboxImpl) Qts(rr objQt, md uint, buf float64) objQt {
 				}
 				r.tt[k] = nv
 				delete(wbi.ts, k)
+                zz++
+                if (zz%1371)==0 {
+                    debug.FreeOSMemory()
+                }
 				ss.Unlock()
 
 			}

@@ -140,9 +140,11 @@ func (readObjsRefqt) dense(buf []byte, st []string, objs elements.ByElementId, c
 }
 
 
-func ReadQts(buf []byte) (elements.Block, error) {
+func ReadQts(idx int, buf []byte, isc bool) (elements.ExtendedBlock, error) {
     
-    return readPlain(buf, readObjsRefqt{})
+    bl,err := readPlain(buf, readObjsRefqt{})
+    if err!=nil { return nil,err }
+    return elements.MakeExtendedBlock(idx,bl,0,0,0,nil),nil
 }
 
 

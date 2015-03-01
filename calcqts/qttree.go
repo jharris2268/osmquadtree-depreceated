@@ -37,17 +37,17 @@ type qtTreeItem struct {
 }
 
 type qtTreeTile struct {
-	b []qtTreeItem
+	b [65536]qtTreeItem
 	p int
 }
 
 //type qtTree map[int]qtTreeTile
 type qtTree struct {
-	t []qtTreeTile
+	t []*qtTreeTile
 }
 
 func newQtTree(q int64, expln int) *qtTree {
-	r := qtTree{make([]qtTreeTile, 0, expln)}
+	r := qtTree{make([]*qtTreeTile, 0, expln)}
 	r.newQtTreeItem(0, 0)
 	return &r
 }
@@ -57,14 +57,15 @@ func (qtt *qtTree) newQtTreeItem(q quadtree.Quadtree, p uint32) uint32 {
 	if cl < 0 || qtt.t[cl].p == len(qtt.t[cl].b) {
 		cl++
 		//println("add tile",cl)
-		qtt.t = append(qtt.t, qtTreeTile{make([]qtTreeItem, 1<<16), 0})
+		//qtt.t = append(qtt.t, qtTreeTile{make([]qtTreeItem, 1<<16), 0})
+        qtt.t = append(qtt.t, &qtTreeTile{})
 
 	}
 
 	ni := (cl << 16) | qtt.t[cl].p
 	qtt.t[cl].b[qtt.t[cl].p] = qtTreeItem{q, 0, 0, p, [4]uint32{0, 0, 0, 0}}
 	qtt.t[cl].p++
-	//println("add",q,ni)
+	
 	return uint32(ni)
 }
 
@@ -167,22 +168,7 @@ func (qtt *qtTree) addint(i uint32, qt quadtree.Quadtree, w int32) {
 		t.children[nv] = qtt.newQtTreeItem(cq, i)
 	}
 	qtt.addint(t.children[nv], qt, w)
-	/*
-	   qtt.t[int(i>>16)].b[i&65535].total += int(w)
-	   if qt==qtt.t[int(i>>16)].b[i&65535].quadTree {
-	       qtt.t[int(i>>16)].b[i&65535].count += w
-	       return
-	   }
-
-	   d := uint(qtt.t[int(i>>16)].b[i&65535].quadTree&31)
-	   nv := qt >> (61-2*d) & 3
-
-	   if qtt.t[int(int(i>>16))].b[i&65535].children[nv] == 0 {
-	       cq := osmread.RoundUp(qt,d+1)
-	       qtt.t[int(i>>16)].b[i&65535].children[nv] = qtt.newQtTreeItem(cq,i)
-	   }
-	   qtt.addint(qtt.t[int(i>>16)].b[i&65535].children[nv],qt,w)
-	*/
+	
 }
 
 func (qtt *qtTree) Find(qt quadtree.Quadtree) uint32 {
@@ -399,7 +385,7 @@ func FindQtGroups(qttin QtTree, target int) QtTree {
 }
 
 func MakeQtTree(inqts []quadtree.Quadtree) QtTree {
-	qttree := newQtTree(0, len(inqts)*3/2)
+	qttree := newQtTree(0, len(inqts)*3/2/65536)
 	for _, q := range inqts {
         
 		qttree.Add(q)
