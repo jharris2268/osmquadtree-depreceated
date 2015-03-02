@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"github.com/jharris2268/osmquadtree/read"
+    "github.com/jharris2268/osmquadtree/utils"
 	"github.com/jharris2268/osmquadtree/quadtree"
 	"github.com/jharris2268/osmquadtree/elements"
 	"sort"
@@ -129,8 +130,93 @@ func (oqi *objQtImpl) ObjsIter(objT elements.ElementType, blckSz int) <-chan ele
 	return res
 }
 
-func newObjQtImpl() objQt {
-	return &objQtImpl{map[elements.Ref]*qtTile{}, 0}
+func newObjQt(useDense bool) objQt {
+    if useDense {
+        return &objQtImpl{map[elements.Ref]*qtTile{}, 0}
+    }
+    return objQtMap{}
+}
+
+
+type objQtMap map[int64]quadtree.Quadtree
+func (oqm objQtMap) Get(r elements.Ref) quadtree.Quadtree {
+    a,ok:=oqm[int64(r)]
+    if !ok {
+        return quadtree.Null
+    }
+    return a
+}
+
+func (oqm objQtMap) Set(r elements.Ref, q quadtree.Quadtree) {
+    oqm[int64(r)]=q
+}
+
+func (oqm objQtMap) Expand(r elements.Ref, q quadtree.Quadtree) {
+    oq := oqm.Get(r)
+    nq := oq.Common(q)
+    oqm.Set(r,nq)
+}
+
+func (oqm objQtMap) Len() int { return len(oqm) }
+func (oqm objQtMap)	ObjsIter(objT elements.ElementType, bs int) <-chan elements.ByElementId {
+    ks:=make(utils.Int64Slice, 0,len(oqm))
+    for k,_ := range oqm {
+        ks=append(ks,k)
+    }
+    ks.Sort()
+    cc:=make(chan elements.ByElementId)
+    go func() {
+        for i:=0; i < len(ks); i+=bs {
+            bss:=bs
+            if len(ks)-i < bs {
+                bss=len(ks)-i
+            }
+            bb:=make(elements.ByElementId, bss)
+            for j,k := range ks[i:i+bss] {
+                bb[j] = read.MakeObjQt(objT, elements.Ref(k), oqm[k])
+            }
+            cc <- bb
+        }
+        close(cc)
+    }()
+    return cc
+}
+
+type wayBboxMap map[int64]*quadtree.Bbox
+
+func (wbm wayBboxMap) Expand(r elements.Ref, ln int64, lt int64) {
+    
+    ri := int64(r)
+    bx,ok := wbm[ri]
+    if !ok {
+        bx = &quadtree.Bbox{ln,lt,ln,lt}
+    } else {
+        bx = bx.ExpandXY(ln,lt)
+    }
+    wbm[ri] = bx
+}
+func (wbm wayBboxMap) Get(r elements.Ref) quadtree.Bbox {
+    
+    ri := int64(r)
+    bx,ok := wbm[ri]
+    if !ok {
+        return *quadtree.NullBbox()
+    }
+    return *bx
+}
+
+func (wbm wayBboxMap) Len() int { return len(wbm) }
+func (wbm wayBboxMap) NumTiles() int { return 1 }
+
+func (wbm wayBboxMap) Qts(qts objQt, md uint, buf float64) objQt {
+    qq := qts.(objQtMap)
+    for k,v := range wbm {
+        
+        q,err := quadtree.Calculate(*v, buf, md)
+        if err!=nil { panic(err.Error()) }
+        qq[k]=q
+    }
+    return qts
 }
 
 type wayBbox interface {
@@ -334,6 +420,9 @@ func (wbi *wayBboxImpl) Qtsz(rr objQt, md uint, buf float64) objQt {
 	return r
 }
 
-func newWayBbox() wayBbox {
-	return &wayBboxImpl{map[elements.Ref]*wayBboxTile{}, 0}
+func newWayBbox(useDense bool) wayBbox {
+    if useDense {
+        return &wayBboxImpl{map[elements.Ref]*wayBboxTile{}, 0}
+    }
+    return wayBboxMap{}
 }

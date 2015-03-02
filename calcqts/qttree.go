@@ -375,6 +375,7 @@ func FindQtGroups(qttin QtTree, target int) QtTree {
 
 			of.Close()
 			//res = append(res, 0)
+            panic("")
 		}
 
 		nqtt.AddMulti(0, int32(t0.total))

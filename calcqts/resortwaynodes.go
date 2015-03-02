@@ -16,7 +16,7 @@ import (
     "sync"
 )
 
-func readWayNodes(infn string, nc int) (blocksort.AllocBlockStore, elements.Block, error) {
+func readWayNodes(infn string, nc int) (blocksort.AllocBlockStore, int, elements.Block, error) {
     
     rels := make([]elements.ByElementId, nc)
     for i,_:=range rels {
@@ -24,7 +24,9 @@ func readWayNodes(infn string, nc int) (blocksort.AllocBlockStore, elements.Bloc
     }
     
     inChans, err := readfile.ReadSomeElementsMulti(infn,nc,false,true,true)
-    if err!=nil { return nil,nil,err}
+    if err!=nil { return nil,0,nil,err}
+    
+    nws := make([]int,nc)
     
     addFunc  := func(block elements.ExtendedBlock, res chan blocksort.IdPacked) error {
         
@@ -46,6 +48,7 @@ func readWayNodes(infn string, nc int) (blocksort.AllocBlockStore, elements.Bloc
                 case elements.Node:
                     continue
                 case elements.Way:
+                    nws[cc]++
                     ei := e.Id()
                     rf,ok := e.(elements.Refs)
                     if !ok {
@@ -74,7 +77,7 @@ func readWayNodes(infn string, nc int) (blocksort.AllocBlockStore, elements.Bloc
     err =  blocksort.AddData(abs,inChans,addFunc)
     
     if err!=nil {
-        return nil,nil,err
+        return nil,0,nil,err
     }
     
     nr := 0
@@ -89,8 +92,12 @@ func readWayNodes(infn string, nc int) (blocksort.AllocBlockStore, elements.Bloc
         rr+=len(r)
     }
     relsf.Sort()
-    fmt.Println("have",nr,len(relsf),"rels")
-    return abs,relsf,nil
+    
+    nw:=0
+    for _,n:=range nws { nw+=n }
+    fmt.Println("have",nw,"ways")
+    fmt.Println("have",len(relsf),"rels")
+    return abs,nw,relsf,nil
 }
 
 type nodeWay struct {
@@ -365,8 +372,8 @@ func mergeNodeAndWayNodes(nodes <-chan []nodeAndWays, wayNodes <-chan nodeWaySli
 	return res
 }
 
-func expandWayBoxes(infn string, abs blocksort.AllocBlockStore, mw, Mw elements.Ref) wayBbox {
-	ans := newWayBbox()
+func expandWayBoxes(infn string, abs blocksort.AllocBlockStore, mw elements.Ref, Mw elements.Ref, useDense bool) wayBbox {
+	ans := newWayBbox(useDense)
 
 	st := time.Now()
 	numNode, numWN, nextP := 0, 0, 0
@@ -403,26 +410,21 @@ func expandWayBoxes(infn string, abs blocksort.AllocBlockStore, mw, Mw elements.
 }
 
 
-func calcWayQts(infn string, abs blocksort.AllocBlockStore) (objQt, error) {
+func calcWayQts(infn string, abs blocksort.AllocBlockStore, useDense bool) (objQt, error) {
 
 	
-	qts := newObjQtImpl()
-
-    /*
-    for i:=0; i < 4; i++ {
-        qts = expandWayBoxes(infn, abs, elements.Ref(i)<<26, elements.Ref(i+1)<<26).Qts(qts, 18, 0.05)
+	qts := newObjQt(useDense)
+    if !useDense {
+        qts = expandWayBoxes(infn, abs, 0, 1<<45,false).Qts(qts, 18, 0.05)
+    
+    } else {
+        mp := elements.Ref(7000)<<14
+        qts = expandWayBoxes(infn, abs, 0, mp,useDense).Qts(qts, 18, 0.05)
         debug.FreeOSMemory()
-        utils.WriteMemProfile()
-        
+        qts = expandWayBoxes(infn, abs, mp, 2*mp,useDense).Qts(qts, 18, 0.05)
+        debug.FreeOSMemory()
+        qts = expandWayBoxes(infn, abs, 2*mp, 1<<45,useDense).Qts(qts, 18, 0.05)
     }
-    qts = expandWayBoxes(infn, abs, 4<<26, 1<<45).Qts(qts, 18, 0.05)
-    */
-    mp := elements.Ref(7000)<<14
-    qts = expandWayBoxes(infn, abs, 0, mp).Qts(qts, 18, 0.05)
-    debug.FreeOSMemory()
-    qts = expandWayBoxes(infn, abs, mp, 2*mp).Qts(qts, 18, 0.05)
-    debug.FreeOSMemory()
-    qts = expandWayBoxes(infn, abs, 2*mp, 1<<45).Qts(qts, 18, 0.05)
     debug.FreeOSMemory()
     //utils.WriteMemProfile()
     
@@ -547,7 +549,7 @@ func writeRelQts(
 	k int,
 	res chan elements.ExtendedBlock) (int, error) {
 
-	rls := newObjQtImpl()
+	rls := newObjQt(false)
 	rr := make(nodeWaySlice, 0, 10000)
 	
     for i:=0; i < rels.Len();i++ {
@@ -598,7 +600,7 @@ func writeRelQts(
 
 func CalcObjectQts(infn string) (<-chan elements.ExtendedBlock, error) {
 	
-    abs, rels, err := readWayNodes(infn,4)
+    abs, numWays, rels, err := readWayNodes(infn,4)
 	if err != nil {
 		return nil, err
 	}
@@ -613,9 +615,9 @@ func CalcObjectQts(infn string) (<-chan elements.ExtendedBlock, error) {
 	fmt.Printf("RelMembs: %-10d %d %-10d => %d %-10d\n", relMems.Len(), rmn>>61, rmn&0x1fffffffffffffff, rmx>>61, rmx&0x1fffffffffffffff)
 	fmt.Printf("have %d rels\n", rls.Len())
     */
+    useDense := numWays > 40000000
     
-    
-	wayQts, err := calcWayQts(infn, abs)
+	wayQts, err := calcWayQts(infn, abs, useDense)
 	if err != nil {
 		return nil, err
 	}

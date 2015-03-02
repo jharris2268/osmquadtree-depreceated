@@ -4,11 +4,14 @@ import (
     "github.com/jharris2268/osmquadtree/elements"
     "sort"
     "sync"
+    "fmt"
 )
 
 type objsIdx struct {
-    k int
-    v elements.ByElementId
+    k  int
+    vv []byte
+    ii []int
+    
 }
 
 
@@ -23,17 +26,33 @@ func SortInMem(
     cc := make(chan objsIdx)
     go func() {
         wg:=sync.WaitGroup{}
+        wg.Add(len(inChans))
         for _,inc:=range inChans {
             go func(inc chan elements.ExtendedBlock) {
                 for b:= range inc {
-                    ll := map[int]elements.ByElementId{}
+                    ll := map[int][][]byte{}
                     for i:=0; i < b.Len(); i++ {
                         e:=b.Element(i)
                         ii := alloc(e)
-                        ll[ii] = append(ll[ii],e)
+                        
+                        
+                        ll[ii] = append(ll[ii],e.Pack())
                     }
                     for k,v := range ll {
-                        cc <- objsIdx{k,v}
+                        ss:=0
+                        for _,vi:=range v {
+                            ss+=len(vi)
+                        }
+                        bb := make([]byte,ss)
+                        ii := make([]int, len(v)+1)
+                        p:=0
+                        for i,vi := range v {
+                            ii[i] = p
+                            copy(bb[p:], vi)
+                            p+=len(vi)
+                        }
+                        ii[len(v)]=ss
+                        cc <- objsIdx{k,bb,ii}
                     }
                 }
                 wg.Done()
@@ -45,10 +64,10 @@ func SortInMem(
     }()
     
     
-    tt := map[int][]elements.ByElementId{}
+    tt := map[int][]objsIdx{}
     mx := -1
     for c:=range cc {
-        tt[c.k] = append(tt[c.k], c.v)
+        tt[c.k] = append(tt[c.k], c)
         if c.k > mx {
             mx=c.k
         }
@@ -68,38 +87,45 @@ func SortInMem(
     res := make([]chan elements.ExtendedBlock, nc)
     for i,_:=range res {
         res[i]=make(chan elements.ExtendedBlock)
+    
+        go func(i int) {
+            for j:=i; j < len(kk); j+=nc {
+                k:=kk[j]
+            
+                vv,ok := tt[k]
+                if !ok {
+                    fmt.Println("WTF",j,k)
+                    continue
+                }
+                tl:=0
+                for _,v := range vv {
+                    tl+=(len(v.ii)-1)
+                }
+                tb:=make(elements.ByElementId, 0, tl)
+                pp:=0
+                for _,v := range vv {
+                    for j,p := range v.ii[:len(v.ii)-1] {
+                        q:=v.ii[j+1]
+                        e := elements.UnpackElement(v.vv[p:q])
+                        tb=append(tb,e)
+                        pp++
+                    }
+                }
+                
+                tb.Sort()
+                
+                bl,_:=makeBlock(j,k,tb)
+                //fmt.Println(j,bl)
+                res[j%nc] <- bl
+                
+            }
+            close(res[i])
+            
+            
+        }(i)
+        
     }
     
-    
-    go func() {
-        for j,i := range kk {
-            vv,ok := tt[i]
-            if !ok {
-                //makeBlock(i%nc, i, nil)
-                continue
-            }
-            tl:=0
-            for _,v := range vv {
-                tl+=len(v)
-            }
-            tb:=make(elements.ByElementId, tl)
-            pp:=0
-            for _,v := range vv {
-                copy(tb[pp:],v)
-                pp+=len(v)
-            }
-            
-            tb.Sort()
-            bl,_:=makeBlock(j,i,tb)
-            res[j%nc] <- bl
-            delete(tt,i)
-            //j++
-        }
-        for _,r:=range res {
-            close(r)
-        }
-    }()
-        
         
     return res, nil
 }

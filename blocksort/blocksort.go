@@ -121,6 +121,7 @@ func ReadData(abs AllocBlockStore, nc int, outputFunc func(int,int,int,IdPackedL
                     panic(err.Error())
                 }
             }
+            
             wg.Done()
             
         }(i)
@@ -207,8 +208,8 @@ func SortElementsByAlloc(
         if err!=nil {
             fmt.Println("SortByTile error:", err.Error())
         }
-        for i,r:=range res {
-            fmt.Println("close chan",i,"/",len(res))
+        for _,r:=range res {
+            //fmt.Println("close chan",i,"/",len(res))
             close(r)
         }
     }()
