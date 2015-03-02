@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+// original: https://github.com/youtube/vitess/blob/master/go/cgzip/writer.go
+// modifed 2015, James Harris to suit zlib file blocks
+
+
+
 package cgzip
 
 // See http://www.zlib.net/zlib_how.html for more information on this

@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+// original: https://github.com/youtube/vitess/blob/master/go/vt/sqlparser/sql.y
+// simplifed 2015, James Harris
+
 %{
 package sqlselect
 import "strings"

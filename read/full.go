@@ -1,3 +1,8 @@
+// Copyright 2015 James Harris. All rights reserved.
+// Use of this source code is governed by the GNU General Public License
+// version 3 (or any later version), both of which can be found in the
+// LICENSE file.
+
 package read
 
 import (
