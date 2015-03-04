@@ -36,6 +36,7 @@ type ElementPair struct {
 	B elements.Element
 }
 
+// Ok() returns false if both A and B are nil
 func (ep ElementPair) Ok() bool {
     return ep.A != nil || ep.B !=nil
 }
@@ -65,6 +66,11 @@ func objCmp(a elements.Element, b elements.Element) int {
 	return 1
 }
 
+
+
+// PairObjs pairs the lhs and rhs blocks by element type and element id. If
+// an element is not present in either the lhs or rhs return nil. Returns
+// an iterator function
 func PairObjs(lhs elements.Block, rhs elements.Block) func() ElementPair {
 	
     ai := 0
@@ -94,9 +100,13 @@ func PairObjs(lhs elements.Block, rhs elements.Block) func() ElementPair {
     }
 }
 
+// PairObjsChan pairs the lhs and rhs chans by element type and element
+// id. If an element is not present in either the lhs or rhs return nil.
+// Returns a channel of ElementPair
 func PairObjsChan(lhs <-chan elements.Element, rhs <-chan elements.Element) <-chan ElementPair {
 	
     res:=make(chan ElementPair)
+    
     
     go func() {
         
@@ -171,6 +181,10 @@ func mergeChangeObjs(blocks blockList) elements.Block {
 	return mergeChangeObjs_(mergeChangeObjs(blocks[:hl]), mergeChangeObjs(blocks[hl:]))
 }
 
+// MergeChangeBlock combines multiple input blocks into a single output
+// block. inBlocks must have the same quadtree value and be sorted in
+// ascending date order. The output block with contain the latest entity
+// for each type and ref.
 func MergeChangeBlock(idx int, inBlocks []elements.ExtendedBlock) elements.ExtendedBlock {
 
 	if len(inBlocks) == 0 {
@@ -189,6 +203,9 @@ func MergeChangeBlock(idx int, inBlocks []elements.ExtendedBlock) elements.Exten
 	return elements.MakeExtendedBlock(idx, objects, qt, sd, ed,nil)
 }
 
+// MergeChange calls MergeChangeBlock for each group of inBlocks (see
+// readfile.ReadPbfFileFullParallel to produce appropiate input chan).
+// Returns output chan of result
 func MergeChange(inBlocks <-chan []elements.ExtendedBlock) (<-chan elements.ExtendedBlock, error) {
 
     

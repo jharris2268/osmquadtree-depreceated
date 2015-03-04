@@ -183,7 +183,11 @@ func (readObjsData) geometry(buf []byte, st []string, ct elements.ChangeType) (e
 
 
 
-
+// ReadObjsData returns an ExtendedBlock of elements with the core data
+// (Type, Changetype and Ref), Quadtree, and the NodeLoc, Refs or Members
+// (without roles) as appropiate. This can be significantly faster than
+// reading the entire object. Setting nodes, ways and rels to false skips
+// objects of this type.
 func ReadObjsData(idx int, buf []byte, nodes, ways, rels bool) (elements.ExtendedBlock, error) {
     
     bl,err:= readPlain(buf, readObjsData{nodes,ways,rels})

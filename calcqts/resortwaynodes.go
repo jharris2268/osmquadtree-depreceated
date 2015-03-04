@@ -603,6 +603,8 @@ func writeRelQts(
 	return k, nil
 }
 
+
+// Calculate a quadtree value for each entity in infn.
 func CalcObjectQts(infn string) (<-chan elements.ExtendedBlock, error) {
 	
     abs, numWays, rels, err := readWayNodes(infn,4)

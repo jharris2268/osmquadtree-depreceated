@@ -43,6 +43,10 @@ type blockIdx struct {
 }
 type blockIdxSlice []blockIdx
 
+// BlockIdx contains the file positions for the pbf data blocks within
+// a file. This can be used read only parts of a pbf file: see
+// readfile.ReadExtendedBlockMultiSortedPartial and
+// readfile.ReadExtendedBlockMultiSortedQts 
 type BlockIdx interface {
 	Len() int
 	Filepos(int) int64
@@ -66,9 +70,11 @@ func (bi blockIdx) String() string {
 		bi.quadtree, cc, bi.filepos, bi.blockLen)
 }
 
+
+// HeaderBlock contains the data found in pbf file HeaderBlock
 type HeaderBlock struct {
-	Bbox     *quadtree.Bbox
-	Features map[string][]string
+	Bbox     *quadtree.Bbox 
+	Features map[string][]string //The required_features, optional_features, and writing_program fields
 	Index    BlockIdx
     Timestamp elements.Timestamp
 }
@@ -121,6 +127,10 @@ func readBlockIdx(indata []byte) (*blockIdx, error) {
 	return ans, nil
 }
 
+
+// ReadHeaderBlock returns a HeaderBlock from pbf message indata. filePos
+// is the file position after the HeaderBlock has been read: this allows
+// the BlockIdx to calculate file positions from the stored block lengths
 func ReadHeaderBlock(indata []byte, filePos int64) (*HeaderBlock, error) {
 	a, msg := utils.ReadPbfTag(indata, 0)
 

@@ -313,9 +313,11 @@ func qttCount(qt QtTree) int {
 	return c
 }
 
-func FindQtGroups(qttin QtTree, target int) QtTree {
-	//res:=make([]uint32,0,500000)
 
+
+// Construct a new QtTree by grouping leaves of qttin 
+func FindQtGroups(qttin QtTree, target int) QtTree {
+	
 	qtt, ok := qttin.(*qtTree)
 	if !ok {
 		panic("qtt not a *qtTree")
@@ -331,7 +333,6 @@ func FindQtGroups(qttin QtTree, target int) QtTree {
 
 		cont := true
 		for cont && !foundzero {
-			//println(mn,mx,qtt.Get(0).total,len(res))
 			r := findGroupInt(qtt, 0, mn, mx)
 			for _, ri := range r {
 				if ri == 0 {
@@ -344,7 +345,7 @@ func FindQtGroups(qttin QtTree, target int) QtTree {
 				t := qtt.Get(ri)
 				nqtt.AddMulti(t.quadTree, int32(t.total))
 			}
-			//res = append(res, r...)
+			
 		}
 		if foundzero {
 			break
@@ -356,7 +357,6 @@ func FindQtGroups(qttin QtTree, target int) QtTree {
 		mx += 500
 		if mx > 50000 {
 			println("mx=", mx)
-			//panic(0)
 			break
 		}
 	}
@@ -379,8 +379,7 @@ func FindQtGroups(qttin QtTree, target int) QtTree {
 			}()
 
 			of.Close()
-			//res = append(res, 0)
-            panic("")
+			panic("")
 		}
 
 		nqtt.AddMulti(0, int32(t0.total))
@@ -390,6 +389,9 @@ func FindQtGroups(qttin QtTree, target int) QtTree {
 	return nqtt
 }
 
+
+// Construct QtTree from slice of quadtree values. This can be used to
+// allocate a quadtree value to the correct tile of a QtTree
 func MakeQtTree(inqts []quadtree.Quadtree) QtTree {
 	qttree := newQtTree(0, len(inqts)*3/2/65536)
 	for _, q := range inqts {

@@ -3,6 +3,7 @@
 // version 3 (or any later version), both of which can be found in the
 // LICENSE file.
 
+// Package read provides functions to read pbf format data. 
 package read
 
 import (
@@ -23,6 +24,10 @@ func (rof readObjsFull) addType(e elements.ElementType) bool {
     return true
 }
 
+// ReadExtendedBlock returns an ExtendedBlock (with extra block metadata)
+// containing FullElements: e.g. elements with type Node can be
+// converted to elements.FullNode, type Way to elements.FullWay, type
+// Relation to elements.FullRelation and Geometry to elements.FullGeometry.
 func ReadExtendedBlock(idx int, buf []byte, change bool) (elements.ExtendedBlock, error) {
     
     return readFull(idx, buf, readObjsFull{true,true}, change)

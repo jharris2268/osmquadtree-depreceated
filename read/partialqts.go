@@ -144,7 +144,8 @@ func (readObjsRefqt) dense(buf []byte, st []string, objs elements.ByElementId, c
     return objs, nil
 }
 
-
+// ReadQts reutrns an ExtendedBlock of elements consiting of the Type,
+// Ref and Quadtree only. This is used by the calcqts.FindGroups function.
 func ReadQts(idx int, buf []byte, isc bool) (elements.ExtendedBlock, error) {
     
     bl,err := readPlain(buf, readObjsRefqt{})

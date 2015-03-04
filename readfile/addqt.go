@@ -71,7 +71,10 @@ type blockPair struct {
     qts  []quadtree.Quadtree
 }
 
-    
+
+// AddQts combines the qt values from the qtsFn file (e.g. produced by
+// calcqts.CalcObjectQts, with the original data (e.g. a downloaded
+// planet.osm.pbf), returning a slice of nc ExtendedBlock channels
 func AddQts(
     mainFn string,
     qtsFn string,

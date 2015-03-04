@@ -109,6 +109,7 @@ func getV(buf []byte, tg uint64) (uint64,bool) {
     return 0,false
 }
 
+// ReadRefs returns a Block of elements containg only the Type and Ref.
 func ReadRefs(buf []byte) (elements.Block, error) {
     return readPlain(buf, readObjsRef{})
 }

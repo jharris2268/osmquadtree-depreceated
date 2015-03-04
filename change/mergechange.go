@@ -59,6 +59,10 @@ func mergeOrigChange(idx int, orig elements.ExtendedBlock, chg elements.Extended
 	return elements.MakeExtendedBlock(idx, objects, orig.Quadtree(), 0, chg.EndDate(), orig.Tags())
 }
 
+
+// MergeOrigAndChange pairs input channels orig (eg. from a planet file)
+// and cbs (change objects, perhaps the output of MergeChange) and applys
+// change to orig. Returns ouput stream split in nc channels
 func MergeOrigAndChange(orig <-chan elements.ExtendedBlock, cbs <-chan elements.ExtendedBlock,  nc int) ([]chan elements.ExtendedBlock, error) {
 
     pp := make([]chan origChangePair, nc)

@@ -69,6 +69,36 @@ func WriteOsmJson(sblc <-chan utils.Idxer, outfn string, header string, footer s
 	return tb, bc, nil
 }
 
+func MakeFeature(o geometry.Geometry, asMerc bool) (map[string]interface{}, error) {
+    om := map[string]interface{}{}
+    om["type"] = "Feature"
+    om["id"] = o.Id()
+    pp := map[string]interface{}{}
+    tt := o.Tags()
+    for j := 0; j < tt.Len(); j++ {
+        k := tt.Key(j)
+        if k=="" {
+            continue
+        }
+        switch k[0] {
+        case '!':
+            ii, _ := utils.ReadVarint([]byte(tt.Value(j)), 0)
+            pp[k[1:]] = ii
+        case '%':
+            ii, _ := utils.ReadUvarint([]byte(tt.Value(j)), 0)
+            pp[k[1:]] = math.Float64frombits(ii)
+        case '$':
+            pp[k[1:]] = nil
+        default:
+            pp[k] = tt.Value(j)
+        }
+    }
+    om["properties"] = pp
+
+    om["geometry"] = o.AsGeoJson(asMerc)
+    
+    return om
+}
 
 func MakeFeatureCollection(bl elements.ExtendedBlock, asMerc bool) map[string]interface{} {
 	bll := map[string]interface{}{}
@@ -87,36 +117,17 @@ func MakeFeatureCollection(bl elements.ExtendedBlock, asMerc bool) map[string]in
 	oo := make([]interface{}, bl.Len())
 	for i, _ := range oo {
         
+        
 		o, err := geometry.ExtractGeometry(bl.Element(i))
 		if err != nil {
 			panic(err.Error())
 		}
-		om := map[string]interface{}{}
-		om["type"] = "Feature"
-		om["id"] = o.Id()
-		pp := map[string]interface{}{}
-		tt := o.Tags()
-		for j := 0; j < tt.Len(); j++ {
-			k := tt.Key(j)
-            if k=="" {
-                continue
-            }
-			switch k[0] {
-			case '!':
-				ii, _ := utils.ReadVarint([]byte(tt.Value(j)), 0)
-				pp[k[1:]] = ii
-			case '%':
-				ii, _ := utils.ReadUvarint([]byte(tt.Value(j)), 0)
-				pp[k[1:]] = math.Float64frombits(ii)
-			case '$':
-				pp[k[1:]] = nil
-			default:
-				pp[k] = tt.Value(j)
-			}
+		
+        om, err := MakeFeature(o)
+        if err != nil {
+			panic(err.Error())
 		}
-		om["properties"] = pp
-
-		om["geometry"] = o.AsGeoJson(asMerc)
+        
 		oo[i] = om
 	}
 
