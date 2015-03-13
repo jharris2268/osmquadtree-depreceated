@@ -190,9 +190,9 @@ func (readObjsData) geometry(buf []byte, st []string, ct elements.ChangeType) (e
 // objects of this type.
 func ReadObjsData(idx int, buf []byte, nodes, ways, rels bool) (elements.ExtendedBlock, error) {
     
-    bl,err:= readPlain(buf, readObjsData{nodes,ways,rels})
+    qt,bl,err:= readPlain(buf, readObjsData{nodes,ways,rels},false)
     if err!=nil {
         return nil,err
     }
-    return elements.MakeExtendedBlock(idx,bl,quadtree.Null,0,0,nil),nil
+    return elements.MakeExtendedBlock(idx,bl,qt,0,0,nil),nil
 }

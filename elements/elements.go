@@ -15,7 +15,7 @@ import (
 // ElementType shows which type of openstreetmap entity is represented by
 // an Element. An element of type Geometry is a node, way or relation 
 // which has been converted to a WKT style Point, Linestring or Polygon
-type ElementType in
+type ElementType int
 
 const (
 	Node ElementType = iota

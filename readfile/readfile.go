@@ -194,7 +194,6 @@ func ReadQtsMulti(fn string, nc int) ([]chan elements.ExtendedBlock, error) {
 
 
 
-
 func SortExtendedBlockChan(inc <-chan elements.ExtendedBlock) <-chan elements.ExtendedBlock {
     idxc := make(chan utils.Idxer)
     go func() {

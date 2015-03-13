@@ -57,21 +57,28 @@ func makeTags(kk []uint64, vv []uint64, st []string) (elements.Tags,error) {
 }
 
 
-func readPlain(buf []byte, readObjsImpl readObjs) (elements.ByElementId,error) {
+func readPlain(buf []byte, readObjsImpl readObjs, change bool) (quadtree.Quadtree, elements.ByElementId,error) {
     objs := make(elements.ByElementId, 0, 10000)
     var err error
+    var qt quadtree.Quadtree
     pos, msg := utils.ReadPbfTag(buf, 0)
     for ; msg.Tag>0; pos,msg = utils.ReadPbfTag(buf, pos) {
         switch msg.Tag {
             case 2:
-                objs, err = readPrimitiveGroup(msg.Data,nil, objs, readObjsImpl, elements.Normal)
+                if change {
+                    objs, err = readPrimitiveGroupChange(msg.Data,nil, objs, readObjsImpl)
+                } else {
+                    objs, err = readPrimitiveGroup(msg.Data,nil, objs, readObjsImpl, elements.Normal)
+                }
+            case 31:
+                qt, err = readQuadtree(msg.Data)
         }
         if err!=nil {
-            return nil,err
+            return quadtree.Null,nil,err
         }
     }
     
-    return objs, nil
+    return qt, objs, nil
 }
 
 

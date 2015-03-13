@@ -97,7 +97,7 @@ func MakeFeature(o geometry.Geometry, asMerc bool) (map[string]interface{}, erro
 
     om["geometry"] = o.AsGeoJson(asMerc)
     
-    return om
+    return om,nil
 }
 
 func MakeFeatureCollection(bl elements.ExtendedBlock, asMerc bool) map[string]interface{} {
@@ -123,7 +123,7 @@ func MakeFeatureCollection(bl elements.ExtendedBlock, asMerc bool) map[string]in
 			panic(err.Error())
 		}
 		
-        om, err := MakeFeature(o)
+        om, err := MakeFeature(o, asMerc)
         if err != nil {
 			panic(err.Error())
 		}

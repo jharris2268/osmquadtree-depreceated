@@ -26,6 +26,17 @@ type idxData struct {
 }
 func (i *idxData) Idx() int { return i.i }
 
+type DataQuadtreer interface {
+    Quadtree()  quadtree.Quadtree
+    Data()      []byte
+}
+
+func (i *idxData) Quadtree() quadtree.Quadtree { return i.q }
+func (i *idxData) Data() []byte { return i.d }
+
+
+
+
 type IdxItem struct {
     Idx int
     Quadtree quadtree.Quadtree
@@ -251,14 +262,14 @@ func WriteBlocks(inc <-chan elements.ExtendedBlock,
     
     items:=make([]IdxItem, 0, 450000)
     for p:=range utils.SortIdxerChan(outc) {
-        d:=p.(*idxData)
-        if d.d!=nil {
+        d:=p.(DataQuadtreer)
+        if d.Data()!=nil {
             
-            pbffile.WriteFileBlockAtEnd(outf,d.d)
-            items=append(items, IdxItem{p.Idx(),d.q,int64(len(d.d)),false})
+            pbffile.WriteFileBlockAtEnd(outf,d.Data())
+            items=append(items, IdxItem{p.Idx(),d.Quadtree(),int64(len(d.Data())),false})
         } else {
             println("null data @", p.Idx())
-            items=append(items, IdxItem{p.Idx(),d.q,int64(0),false})
+            items=append(items, IdxItem{p.Idx(),d.Quadtree(),int64(0),false})
         }
     }
     

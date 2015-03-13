@@ -150,6 +150,9 @@ func PackLonlat(ln int64, lt int64) []byte {
 }
 
 func unpackLonlat(buf []byte) (int64, int64) {
+    if len(buf)==0 {
+        return 0,0
+    }
 	a := int64(buf[0]) << 24
 	a |= int64(buf[1]) << 16
 	a |= int64(buf[2]) << 8
@@ -193,7 +196,9 @@ func packRefs(nn []Ref) []byte {
 }
 
 func unpackRefs(buf []byte) []Ref {
-
+    if len(buf) == 0 {
+        return nil
+    }
 	l, p := utils.ReadVarint(buf, 0)
 	if l < 0 || l == 0 && len(buf) > p {
 		return nil
@@ -212,6 +217,7 @@ func unpackRefs(buf []byte) []Ref {
 }
 
 func PackMembers(mm Members) []byte {
+    
 	tl := 10 + 15*mm.Len()
 	for i := 0; i < mm.Len(); i++ {
 		tl += len(mm.Role(i))
@@ -249,6 +255,10 @@ func packMembers(rms []relMember) []byte {
 }
 
 func unpackMembers(buf []byte) []relMember {
+    if len(buf) == 0 {
+        return nil
+    }
+    
 	l, p := utils.ReadVarint(buf, 0)
 
 	t := int64(0)
