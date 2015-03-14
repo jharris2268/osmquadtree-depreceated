@@ -6,6 +6,7 @@ import (
     "os"
     "fmt"
     "sync"
+    "sort"
     
     "github.com/jharris2268/osmquadtree/utils"
     "github.com/jharris2268/osmquadtree/readfile"
@@ -38,6 +39,19 @@ func readIndexBlock(dd []byte) ([]int64, []int64) {
     return c,d
 }
 
+
+type tt struct {
+    
+    i int64
+    v int
+}
+
+type tts []tt
+func (t tts) Len() int { return len(t) }
+func (t tts) Swap(i,j int) { t[i],t[j]=t[j],t[i] }
+func (t tts) Less(i,j int) bool { return t[i].i < t[j].i }
+func (t tts) Sort() { sort.Sort(t) }
+
 func prepBlock(tt tts) []byte {
     a := make([]int64, len(tt))
     b := make([]int64, len(tt))
@@ -64,11 +78,12 @@ func serializeLocs(a,b []int64) []byte {
 
 type idxData struct {
     i int
+    q quadtree.Quadtree
     d []byte
 }
 
 func (i *idxData) Idx() int { return i.i }
-func (i *idxData) Quadtree() quadtree.Quadtree { return quadtree.Null }
+func (i *idxData) Quadtree() quadtree.Quadtree { return i.q }
 func (i *idxData) Data() []byte { return i.d }
 
 func addIndexBlock(bl elements.ExtendedBlock, i int) (utils.Idxer,error) {
@@ -91,11 +106,11 @@ func addIndexBlock(bl elements.ExtendedBlock, i int) (utils.Idxer,error) {
     dd,err := pbffile.PreparePbfFileBlock([]byte("IdxBlock"),cc,true)
     if err!=nil { return nil,err }
         
-    return &idxData{bl.Idx(),dd},nil
+    return &idxData{bl.Idx(),quadtree.Null,dd},nil
 }
 
 
-func MakeLocationsCachePbfIndex(
+func MakeLocationsCachePbfIndexzz(
     inChans []chan elements.ExtendedBlock, infn string, prfx string,
     endDate elements.Timestamp, state int64) error {
     
@@ -146,6 +161,65 @@ func MakeLocationsCachePbfIndex(
     }
     
     fmt.Println("have", len(zz), "tiles", len(qq), "qts", utils.MemstatsStr())
+    
+    
+    writeSpecs(prfx, []IdxItem{IdxItem{0,infn,endDate,state}}, []int{len(qq)})
+    return nil
+}
+
+func MakeLocationsCachePbfIndex(
+    inChans []chan elements.ExtendedBlock, infn string, prfx string,
+    endDate elements.Timestamp, state int64) error {
+ 
+    outcc := make(chan utils.Idxer)
+    go func() {
+        wg:=sync.WaitGroup{}
+        for i,_ := range inChans {
+            wg.Add(1)
+            go func(i int) {
+                for bl := range inChans[i] {
+                    ii := int64(bl.Idx()-1)
+                    aa := make([]int64, bl.Len())
+                    bb := make([]int64, bl.Len())
+                    
+                    for j,_ := range aa {
+                        e:=bl.Element(j)
+                        k := int64(e.Type())<<59 | int64(e.Id())
+                        aa[j] = k
+                        bb[j] = ii
+                    }
+                    
+                    cc := serializeLocs(aa,bb)
+                    dd,err := pbffile.PreparePbfFileBlock([]byte("IdxBlock"),cc,true)
+                    if err!=nil { panic(err.Error()) }
+                    outcc <- &idxData{bl.Idx(),bl.Quadtree(),dd}
+                }
+                wg.Done()
+            }(i)
+        }
+        wg.Wait()
+        close(outcc)
+    }()
+    
+    
+    
+    
+    outf,err := os.Create(prfx+infn+"-index.pbf")
+    if err!=nil { panic(err.Error()) }
+    defer outf.Close()
+    
+    zz:=0
+    qq:=make(quadtree.QuadtreeSlice,0,500000)
+    for pp := range utils.SortIdxerChan(outcc) {
+        dd := pp.(interface{ Data() []byte }).Data()
+        pbffile.WriteFileBlockAtEnd(outf, dd)
+        zz++
+        
+        q := pp.(elements.Quadtreer).Quadtree()
+        qq=append(qq,q)
+    }
+    
+    fmt.Println("have", zz, "tiles", len(qq), "qts", utils.MemstatsStr())
     
     
     writeSpecs(prfx, []IdxItem{IdxItem{0,infn,endDate,state}}, []int{len(qq)})
