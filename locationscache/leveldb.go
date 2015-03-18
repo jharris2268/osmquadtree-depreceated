@@ -203,7 +203,7 @@ func get_tile(cache *Cache, k int64) ([]int64, error) {
 
 
 
-func GetCacheSpecs(prfx string) ([]IdxItem, []quadtree.Quadtree, error) {
+func GetCacheSpecsLevelDb(prfx string) ([]IdxItem, []quadtree.Quadtree, error) {
 
 	cache := new(Cache)
 	err := cache.open(prfx+"locationscache", false)
@@ -268,7 +268,7 @@ func getCacheSpecs(cache *Cache) ([]IdxItem, []quadtree.Quadtree, error) {
 }
 
 func GetLastStateLevelDb(prfx string) (int64,error) {
-	ii, _,err := GetCacheSpecs(prfx)
+	ii, _,err := GetCacheSpecsLevelDb(prfx)
     if err!=nil { return 0, err }
 	if len(ii) == 0 {
 		return 0,nil

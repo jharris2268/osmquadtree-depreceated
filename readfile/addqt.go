@@ -182,7 +182,7 @@ func AddQts(
                     res[i] <- elements.MakeExtendedBlock(p.main.Idx(),nb, quadtree.Null,0,0,nil)
                 }
             }
-            fmt.Println("close chan",i,"/",len(res))
+            //fmt.Println("close chan",i,"/",len(res))
             close(res[i])
         }(i)
     }

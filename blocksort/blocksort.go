@@ -118,9 +118,23 @@ func ReadData(abs AllocBlockStore, nc int, outputFunc func(int,int,int,IdPackedL
     itr := abs.Iter()
     wg:=sync.WaitGroup{}
     wg.Add(nc)
+    
+    zz := make([]chan BlockStoreAllocPair,nc)
+    for i,_:=range zz {
+        zz[i]=make(chan BlockStoreAllocPair,5)
+    }
+    go func() {
+        for bl:=range itr {
+            zz[bl.idx%nc] <- bl
+        }
+        for _,z:=range zz {
+            close(z)
+        }
+    }()
+    
     for i:=0; i < nc; i++ {
         go func(i int) {
-            for bl := range itr {
+            for bl := range zz[i] {
                 err:=outputFunc(i,bl.idx,bl.alloc,bl.block.All())
                 if err!=nil {
                     panic(err.Error())
@@ -200,7 +214,7 @@ func SortElementsByAlloc(
         res[i] = make(chan elements.ExtendedBlock)
     }
         
-    outputFunc :=func(i int, idx int, al int, all IdPackedList) error {
+    outputFunc := func(i int, idx int, al int, all IdPackedList) error {
         pp := makeByElementId(all)
         bl,err := makeBlock(idx, al, pp)
         if err!=nil { return err }

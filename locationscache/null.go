@@ -1,3 +1,8 @@
+// Copyright 2015 James Harris. All rights reserved.
+// Use of this source code is governed by the GNU General Public License
+// version 3 (or any later version), both of which can be found in the
+// LICENSE file.
+
 package locationscache
 
 
@@ -31,6 +36,22 @@ func GetLastStateFileList(pp string) (int64, error) {
     return spec[len(spec)-1].State, nil
 }
 
+func GetCacheSpecsFileList(prfx string) ([]IdxItem, []quadtree.Quadtree, error) {
+    spec,_,err := readSpecs(prfx)
+    if err!=nil { return nil,nil,err }
+    
+    _,hh,err := readfile.GetHeaderBlock(prfx+spec[0].Filename)
+    if err!=nil { return nil,nil,err }
+    
+    qq:=make([]quadtree.Quadtree,hh.Index.Len())
+    for i,_ := range qq {
+        qq[i] = hh.Index.Quadtree(i)
+    }
+    
+    return spec,qq,nil
+}
+    
+    
 
 type FS struct {
     State       int64

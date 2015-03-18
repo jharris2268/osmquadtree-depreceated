@@ -13,10 +13,11 @@ import (
     "github.com/jharris2268/osmquadtree/quadtree"
     "sync"
     "os"
-    "sort"
+    //"sort"
     "fmt"
     "io/ioutil"
     "io"
+    "time"
 )
 
 type idxData struct {
@@ -126,30 +127,45 @@ func WritePbfIndexed(inc <-chan elements.ExtendedBlock, outf io.Writer, tf io.Re
             }
         }
         
-        ii,err := WriteBlocks(inc,outf,addBl,isc)
-        
-        if err!=nil { return nil,err}
-        if plain {
-            return nil,nil
-        }
-        
-        sort.Sort(blockIdx(ii))
-        for i,_:=range ii {
-            
-            
-            //ii[i].Quadtree=qm[i]
-            ii[i].Isc=isc
-        }
+        return writeUnIndexed(inc,outf,isc,addBl)
         
         
-        return blockIdx(ii),err
     }
     
     
     ii,err := WriteBlocks(inc,tf,addBl,false)
+    //ii,err := WriteBlocksOrdered(inc,tf,addBl)
     if err!=nil {
         return nil,err
     }
+    
+    return finishAndHeader(outf, tf, ii,isc)
+}
+
+func writeUnIndexed(inc <- chan elements.ExtendedBlock, outf io.Writer, isc bool,
+    addBl func(bl elements.ExtendedBlock,i int) (utils.Idxer,error) ) (write.BlockIdxWrite,error) {
+    
+    ii,err := WriteBlocks(inc,outf,addBl,isc)
+        
+    if err!=nil { return nil,err}
+    if ii==nil {
+        return nil,nil
+    }
+        
+    //sort.Sort(blockIdx(ii))
+    for i,_:=range ii {
+        
+        
+        //ii[i].Quadtree=qm[i]
+        ii[i].Isc=isc
+    }
+    
+    
+    return blockIdx(ii),err
+}
+
+
+func finishAndHeader(outf io.Writer, tf io.ReadWriter, ii []IdxItem,isc bool) (write.BlockIdxWrite,error) {
     
     tfs,ok := tf.(interface{
         Sync() error
@@ -170,7 +186,7 @@ func WritePbfIndexed(inc <-chan elements.ExtendedBlock, outf io.Writer, tf io.Re
         }
     }
     
-    sort.Sort(blockIdx(ii))
+    //sort.Sort(blockIdx(ii))
     for i,_:=range ii {
         
         
@@ -208,6 +224,41 @@ func WritePbfIndexed(inc <-chan elements.ExtendedBlock, outf io.Writer, tf io.Re
 }
 
  
+ 
+ 
+func WritePbfFileM(inc []chan elements.ExtendedBlock, outfn string, isc bool) (write.BlockIdxWrite,error) {
+    outf,err:=os.Create(outfn)
+    if err!=nil {
+        return nil,err
+    }
+    defer outf.Close()
+    
+    tf,err := ioutil.TempFile("","osmquadtree.writefile.tmp")
+    if err!=nil {
+        return nil,err
+    }
+        
+    
+    defer func() {
+        tf.Close()
+        os.Remove(tf.Name())
+    }()
+    
+     addBl := func(bl elements.ExtendedBlock,i int) (utils.Idxer,error) {
+        return addFullBlock(bl,i,isc,[]byte("OSMData"))
+    }
+    
+    ii,err := WriteBlocksOrdered(inc,tf,addBl)
+    if err!=nil {
+        return nil,err
+    }
+    
+    return finishAndHeader(outf, tf, ii,isc)
+}
+ 
+ 
+ 
+ 
 func WriteQts(inc <-chan elements.ExtendedBlock, outfn string) error {
     outf,err:=os.Create(outfn)
     if err!=nil {
@@ -218,12 +269,98 @@ func WriteQts(inc <-chan elements.ExtendedBlock, outfn string) error {
     return err
 }
 
+
+func WriteBlocksOrdered(
+    inchans []chan elements.ExtendedBlock,
+    outf io.Writer,
+    addBlock func(elements.ExtendedBlock, int) (utils.Idxer, error),
+    ) ([]IdxItem, error) {
+    
+    /*mm := make(chan string)
+    go func() {
+        for m:=range mm {
+            fmt.Println(m)
+        }
+        fmt.Println("closed mm")
+    }()*/
+    
+    vv := make([]chan utils.Idxer,len(inchans))
+    for j,_:=range inchans {
+        vv[j] = make(chan utils.Idxer,5)
+    }
+    
+    
+    
+    for i,_ := range inchans {
+        
+        go func(i int) {
+            //z:=0
+            for bl := range inchans[i] {
+                //fmt.Println("ch",i,bl.Idx(),i%4,bl.Quadtree())
+                t,err := addBlock(bl,0)
+                if err!=nil { panic(err.Error()) }
+                
+                vv[i] <- t
+           // z = bl.Idx()
+            }
+            //mm<-fmt.Sprintf("%d done @ %d",i,z)
+            close(vv[i])
+        }(i)
+    }
+            
+            
+    st:=time.Now()
+    items:=make([]IdxItem, 0, 450000)
+    rem := 4
+    j:=0
+    
+    var mm string
+    
+    for rem>0 {
+        
+        p,ok := <- vv[j%4]
+        if !ok {
+            
+            //mm<-fmt.Sprintf("%d: @ %d rem %d",j%4,j,rem)
+            rem -= 1
+        } else {
+        
+            d:=p.(DataQuadtreer)
+            if d.Data()!=nil {
+                
+                
+                
+                pbffile.WriteFileBlockAtEnd(outf,d.Data())
+                li := IdxItem{p.Idx(),d.Quadtree(),int64(len(d.Data())),false}
+                items=append(items, li)
+                
+                mm = fmt.Sprintf("\r%8.1fs %6d %-18s %8d bytes", time.Since(st).Seconds(), li.Idx, li.Quadtree, li.Len)
+                if (p.Idx()%3871)==0 {
+                    fmt.Printf(mm)
+                }
+                
+            } else {
+                fmt.Printf("\n%8.1fs: NULL p.Idx()\n", time.Since(st).Seconds(), p.Idx())
+                mm=""
+                items=append(items, IdxItem{p.Idx(),d.Quadtree(),int64(0),false})
+            }
+        }
+        
+        j++
+    }
+    fmt.Println(mm)
+    
+    //close(mm)
+    return items, nil
+}
+ 
+
 func WriteBlocks(inc <-chan elements.ExtendedBlock,
     outf io.Writer,
     addBlock func(elements.ExtendedBlock, int) (utils.Idxer,error),
     off bool ) ([]IdxItem,error) {
 
-    
+
 
     outc:=make(chan utils.Idxer)
     
@@ -245,28 +382,44 @@ func WriteBlocks(inc <-chan elements.ExtendedBlock,
         }
         
         for i:=0; i < 4; i++ {
-            go func() {
+            go func(i int) {
+                //z:=0
+                //l:=0
                 for bl:=range inc {
                     t,err := addBlock(bl,fo)
                     if err!=nil {
                         panic(err.Error())
                     }
                     outc <- t
+                    //z++
+                    //l = bl.Idx()
                 }
+                //println("finished",i,"(",z,"blocks, last", l,")")
                 wg.Done()
-            }()
+            }(i)
         }
         wg.Wait()
+        //println("done, closing outc")
         close(outc)
     }()
     
+    st:=time.Now()
     items:=make([]IdxItem, 0, 450000)
     for p:=range utils.SortIdxerChan(outc) {
+        
         d:=p.(DataQuadtreer)
         if d.Data()!=nil {
             
+            
+            
             pbffile.WriteFileBlockAtEnd(outf,d.Data())
             items=append(items, IdxItem{p.Idx(),d.Quadtree(),int64(len(d.Data())),false})
+            
+            if (p.Idx()%12874)==0 {
+                
+                fmt.Println(items[len(items)-1],time.Since(st).Seconds())
+            }
+            
         } else {
             println("null data @", p.Idx())
             items=append(items, IdxItem{p.Idx(),d.Quadtree(),int64(0),false})

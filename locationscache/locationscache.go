@@ -8,10 +8,12 @@ package locationscache
 import (
 	
 	"fmt"
-	
+	"os"
     "errors"
+    "encoding/json"
 	
 	"github.com/jharris2268/osmquadtree/elements"
+    "github.com/jharris2268/osmquadtree/quadtree"
 	
 )
 
@@ -73,4 +75,43 @@ func MakeLocationsCache(inBlocks []chan elements.ExtendedBlock, lctype string, i
     
     return errors.New(fmt.Sprintf("%q not a reconised lctype",lctype))
 }
+
+func GetCacheSpecs(prfx string, lctype string) ([]IdxItem, []quadtree.Quadtree, error) {
+    switch lctype {
+        case "null","pbf": return GetCacheSpecsFileList(prfx)
+        case "leveldb": return GetCacheSpecsLevelDb(prfx)
+    }
+    return nil,nil,errors.New(fmt.Sprintf("%q not a reconised lctype",lctype))
+}
+
+type UpdateSettings struct {
+	SourcePrfx    string
+	DiffsLocation string
+	InitialState  int64
+	RoundTime     bool
+    LocationsCache string
+}
     
+const DefaultSource = string("http://planet.openstreetmap.org/replication/day/")
+
+func GetUpdateSettings(prfx string) (UpdateSettings, error) {
+    fl,err := os.Open(prfx+"settings.json")
+    if err!=nil { return UpdateSettings{},err }
+    defer fl.Close()
+    us := UpdateSettings{}
+    err = json.NewDecoder(fl).Decode(&us)
+    if err!=nil { return UpdateSettings{},err }
+    
+    return us,nil
+}
+
+func WriteUpdateSettings(prfx string, us UpdateSettings) error {
+    fl,err := os.Create(prfx+"settings.json")
+    if err!=nil { return err }
+    defer fl.Close()
+    
+    err = json.NewEncoder(fl).Encode(&us)
+    if err!=nil { return err }
+    
+    return nil
+}
