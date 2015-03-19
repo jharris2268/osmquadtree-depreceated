@@ -3,17 +3,17 @@
 // version 3 (or any later version), both of which can be found in the
 // LICENSE file.
 
-// +build !windows
+// +build windows
 
 package utils
 
 import (
 	"bytes"
-	//"compress/zlib"
+	"compress/zlib"
 	"errors"
 	"fmt"
 	"io"
-	zlib "github.com/jharris2268/osmquadtree/utils/cgzip"
+	
 )
 
 func ReadBlock(file io.Reader, size uint64) ([]byte, error) {

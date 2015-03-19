@@ -3,6 +3,8 @@
 // version 3 (or any later version), both of which can be found in the
 // LICENSE file.
 
+// +build !windows
+
 package locationscache
 
 import (
@@ -127,7 +129,7 @@ func write_locsmap(cache *Cache, lm LocsMap, o int, edd int64, fstr string, stat
 	return nil
 }
 
-    
+/*    
 func AddNewEntries(prfx string, lm LocsMap, o int, edd elements.Timestamp, fstr string, state int64) error {
 
     
@@ -142,7 +144,7 @@ func AddNewEntries(prfx string, lm LocsMap, o int, edd elements.Timestamp, fstr 
     
     
 	return write_locsmap(cache, lm, o, int64(edd), fstr, state)
-}
+}*/
 
 func make_date_header(fstr string, edd int64, state int64) []byte {
 	out := make([]byte, 30+len(fstr))
@@ -294,14 +296,14 @@ func unpackTile(data []byte) []int64 {
 }
 
 //func GetTiles(prfx string, inids <-chan int64) (map[int64]bool, LocsMap) {
-func GetTiles(prfx string, inids <-chan int64) LocsMap {
+/*func GetTiles(prfx string, inids <-chan int64) LocsMap {
 
 	cache := new(Cache)
 	cache.open(prfx+"locationscache", false)
 	defer cache.Close()
     
     return getTiles(cache, inids)
-}
+}*/
 
 func getTiles(cache *Cache, inids <-chan int64) LocsMap {
     
