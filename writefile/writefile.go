@@ -133,7 +133,7 @@ func WritePbfIndexed(inc <-chan elements.ExtendedBlock, outf io.Writer, tf io.Re
     }
     
     
-    ii,err := WriteBlocks(inc,tf,addBl,false)
+    ii,err := WriteBlocks(inc,tf,addBl,false,true)
     //ii,err := WriteBlocksOrdered(inc,tf,addBl)
     if err!=nil {
         return nil,err
@@ -145,7 +145,7 @@ func WritePbfIndexed(inc <-chan elements.ExtendedBlock, outf io.Writer, tf io.Re
 func writeUnIndexed(inc <- chan elements.ExtendedBlock, outf io.Writer, isc bool,
     addBl func(bl elements.ExtendedBlock,i int) (utils.Idxer,error) ) (write.BlockIdxWrite,error) {
     
-    ii,err := WriteBlocks(inc,outf,addBl,isc)
+    ii,err := WriteBlocks(inc,outf,addBl,isc,true)
         
     if err!=nil { return nil,err}
     if ii==nil {
@@ -248,7 +248,7 @@ func WritePbfFileM(inc []chan elements.ExtendedBlock, outfn string, isc bool) (w
         return addFullBlock(bl,i,isc,[]byte("OSMData"))
     }
     
-    ii,err := WriteBlocksOrdered(inc,tf,addBl)
+    ii,err := WriteBlocksOrdered(inc,tf,addBl,false)
     if err!=nil {
         return nil,err
     }
@@ -265,7 +265,7 @@ func WriteQts(inc <-chan elements.ExtendedBlock, outfn string) error {
         return err
     }
     defer outf.Close()
-    _,err = WriteBlocks(inc,outf,addQtBlock,true)
+    _,err = WriteBlocks(inc,outf,addQtBlock,true,false)
     return err
 }
 
@@ -274,7 +274,7 @@ func WriteBlocksOrdered(
     inchans []chan elements.ExtendedBlock,
     outf io.Writer,
     addBlock func(elements.ExtendedBlock, int) (utils.Idxer, error),
-    ) ([]IdxItem, error) {
+    prog bool) ([]IdxItem, error) {
     
     /*mm := make(chan string)
     go func() {
@@ -333,10 +333,11 @@ func WriteBlocksOrdered(
                 pbffile.WriteFileBlockAtEnd(outf,d.Data())
                 li := IdxItem{p.Idx(),d.Quadtree(),int64(len(d.Data())),false}
                 items=append(items, li)
-                
-                mm = fmt.Sprintf("\r%8.1fs %6d %-18s %8d bytes", time.Since(st).Seconds(), li.Idx, li.Quadtree, li.Len)
-                if (p.Idx()%3871)==0 {
-                    fmt.Printf(mm)
+                if prog {
+                    mm = fmt.Sprintf("\r%8.1fs %6d %-18s %8d bytes", time.Since(st).Seconds(), li.Idx, li.Quadtree, li.Len)
+                    if (p.Idx()%3871)==0 {
+                        fmt.Printf(mm)
+                    }
                 }
                 
             } else {
@@ -348,7 +349,9 @@ func WriteBlocksOrdered(
         
         j++
     }
-    fmt.Println(mm)
+    if prog {
+        fmt.Println(mm)
+    }
     
     //close(mm)
     return items, nil
@@ -358,7 +361,7 @@ func WriteBlocksOrdered(
 func WriteBlocks(inc <-chan elements.ExtendedBlock,
     outf io.Writer,
     addBlock func(elements.ExtendedBlock, int) (utils.Idxer,error),
-    off bool ) ([]IdxItem,error) {
+    off bool, prog bool ) ([]IdxItem,error) {
 
 
 
@@ -415,7 +418,7 @@ func WriteBlocks(inc <-chan elements.ExtendedBlock,
             pbffile.WriteFileBlockAtEnd(outf,d.Data())
             items=append(items, IdxItem{p.Idx(),d.Quadtree(),int64(len(d.Data())),false})
             
-            if (p.Idx()%12874)==0 {
+            if prog && (p.Idx()%12874)==0 {
                 
                 fmt.Println(items[len(items)-1],time.Since(st).Seconds())
             }

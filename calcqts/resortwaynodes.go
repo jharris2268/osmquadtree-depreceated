@@ -21,6 +21,11 @@ import (
     "sync"
 )
 
+type psp struct {
+    idx, nn, mm int
+    bls string
+}
+
 func readWayNodes(infn string, nc int) (blocksort.AllocBlockStore, int, elements.Block, error) {
     
     rels := make([]elements.ByElementId, nc)
@@ -33,14 +38,15 @@ func readWayNodes(infn string, nc int) (blocksort.AllocBlockStore, int, elements
     
     nws := make([]int,nc)
     
+    
+    prog := make(chan psp)
+    
+    
+    
     addFunc  := func(block elements.ExtendedBlock, res chan blocksort.IdPacked) error {
         
         if block==nil { return nil }
-        
-        if (block.Idx()%137)==0  {
-            fmt.Printf("%8d %s\n",block.Idx(), block.String())
-        }
-        
+                
         cc := block.Idx() % nc  
         
         if block.Len()==0 { return nil }
@@ -70,20 +76,49 @@ func readWayNodes(infn string, nc int) (blocksort.AllocBlockStore, int, elements
             }
         }
         
+        
+        
+        nn,mm:=0,0
         for k,v := range rp {
             res <- blocksort.IdPacked{k, v.Pack()}
+            nn += len(v)
+            mm += 1
         }
+        prog <- psp{block.Idx(),nn,mm,block.String()}
+                
         return nil
     }
-            
-                
-    //abs:= blocksort.MakeAllocBlockStore("tempfilesplit")
+    
     abs := blocksort.MakeAllocBlockStore("tempfileslim")
+    
+    
+    go func() {
+        st:=time.Now()
+        progstep := 1874215
+        nn,mm,nb,ps,idx := 0,0,1,"",0
+        
+        for p := range prog {
+            nn += p.nn
+            mm += p.mm
+            idx= p.idx
+            ps = p.bls
+            if nn > nb {
+                fmt.Printf("\r%8.1fs %10d [%10d %10d] %s", time.Since(st).Seconds(),idx,nn,mm,ps)
+                nb += progstep 
+            }
+        }
+        fmt.Printf("\r%8.1fs %10d [%10d %10d] %s\n", time.Since(st).Seconds(),idx,nn,mm,ps)
+        fmt.Printf("have %d objs in %d blocks\n", abs.TotalLen(), abs.NumBlocks())
+    }()
+    
+                
+    
     err =  blocksort.AddData(abs,inChans,addFunc)
     
     if err!=nil {
         return nil,0,nil,err
     }
+    close(prog)
     
     nr := 0
     for _,r:= range rels {

@@ -56,6 +56,7 @@ func readStringsDelta(buf []byte, st []string) ([]string, error) {
 
 func readInfo(buf []byte, st []string) (elements.Info, error) {
     vs,ts,cs,ui := int64(0),elements.Timestamp(0),elements.Ref(0),int64(0)
+    vv := true
     
     us := ""
     pos,msg := utils.ReadPbfTag(buf,0)
@@ -66,9 +67,10 @@ func readInfo(buf []byte, st []string) (elements.Info, error) {
             case 3: cs = elements.Ref(msg.Value)
             case 4: ui = int64(msg.Value)
             case 5: us = st[msg.Value]
+            case 6: vv = msg.Value!=0
         }
     }
-    return elements.MakeInfo(vs,ts,cs,ui,us), nil
+    return elements.MakeInfo(vs,ts,cs,ui,us,vv), nil
 }
             
             
@@ -187,7 +189,7 @@ func (r readObjsFull) geometry(buf []byte, st []string, ct elements.ChangeType) 
 }
 
 func readDenseInfo(buf []byte, st []string) ([]elements.Info, error) {
-    vs, ts, cs, ui, us := []uint64{},[]int64{},[]int64{},[]int64{},[]string{}
+    vs, ts, cs, ui, us, vv := []uint64{},[]int64{},[]int64{},[]int64{},[]string{}, []uint64{}
     var err error
     pos,msg := utils.ReadPbfTag(buf,0)
     for ; msg.Tag>0; pos,msg = utils.ReadPbfTag(buf,pos) {
@@ -200,6 +202,7 @@ func readDenseInfo(buf []byte, st []string) ([]elements.Info, error) {
                 if st!=nil {
                     us,err = readStringsDelta(msg.Data, st)
                 }
+            case 6: vv,err = utils.ReadPackedList(msg.Data)
         }
         if err!=nil {
             return nil, err
@@ -212,7 +215,11 @@ func readDenseInfo(buf []byte, st []string) ([]elements.Info, error) {
         if i < len(us) {
             u = us[i]
         }
-        res[i] = elements.MakeInfo(int64(v), elements.Timestamp(ts[i]), elements.Ref(cs[i]), ui[i], u)
+        vis := true
+        if i < len(vv) {
+            vis=vv[i]!=0
+        }
+        res[i] = elements.MakeInfo(int64(v), elements.Timestamp(ts[i]), elements.Ref(cs[i]), ui[i], u,vis)
     }
     return res,nil
 }

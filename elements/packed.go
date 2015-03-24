@@ -67,7 +67,7 @@ func (po PackedElement) String() string {
 	return fmt.Sprintf("Packed %d %d %10d [%d bytes]", po.ChangeType(), po.Type(), po.Id(), len(po))
 }
 
-func packInfo(vs int64, ts Timestamp, cs Ref, ui int64, user string) []byte {
+func packInfo(vs int64, ts Timestamp, cs Ref, ui int64, user string,visible bool) []byte {
 	l := 50 + len(user)
 	res := make([]byte, l)
 	p := utils.WriteVarint(res, 0, vs)
@@ -75,12 +75,15 @@ func packInfo(vs int64, ts Timestamp, cs Ref, ui int64, user string) []byte {
 	p = utils.WriteVarint(res, p, int64(cs))
 	p = utils.WriteVarint(res, p, ui)
 	p = utils.WriteData(res, p, []byte(user))
-
+    if !visible {
+        res[p] = 0
+        p++
+    }
 	return res[:p]
 }
 
-func unpackInfo(buf []byte) (int64, Timestamp, Ref, int64, string) {
-	vs, ts, cs, ui := int64(0), int64(0), int64(0), int64(0)
+func unpackInfo(buf []byte) (int64, Timestamp, Ref, int64, string,bool) {
+	vs, ts, cs, ui, vv := int64(0), int64(0), int64(0), int64(0), true
 	us := []byte{}
 	p := 0
 	vs, p = utils.ReadVarint(buf, p)
@@ -88,7 +91,10 @@ func unpackInfo(buf []byte) (int64, Timestamp, Ref, int64, string) {
 	cs, p = utils.ReadVarint(buf, p)
 	ui, p = utils.ReadVarint(buf, p)
 	us, p = utils.ReadData(buf, p)
-	return vs, Timestamp(ts), Ref(cs), ui, string(us)
+    if p < len(buf) {
+        vv = buf[p]!=0
+    }
+	return vs, Timestamp(ts), Ref(cs), ui, string(us), vv
 }
 
 func unpackTags(buf []byte) ([]string, []string) {
@@ -300,8 +306,8 @@ func UnpackElement(buf []byte) FullElement {
 
 	var info Info
 	if in != nil {
-		a, b, c, d, e := unpackInfo(in)
-		info = &unpackedInfo{a, b, c, d, e}
+		a, b, c, d, e,f := unpackInfo(in)
+		info = &unpackedInfo{a, b, c, d, e,f}
 	}
 	var tags Tags
 	if tg != nil {

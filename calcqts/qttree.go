@@ -329,7 +329,7 @@ func FindQtGroups(qttin QtTree, target int) QtTree {
 
 	nqtt := newQtTree(0, 1)
 
-	for qtt.Get(0).total >= mn && !foundzero {
+	for qtt.Get(0).total > 1000 && !foundzero {
 
 		cont := true
 		for cont && !foundzero {

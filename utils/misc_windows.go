@@ -3,7 +3,7 @@
 // version 3 (or any later version), both of which can be found in the
 // LICENSE file.
 
-// +build !windows
+// +build windows
 
 package utils
 
@@ -38,21 +38,8 @@ func WriteMemoryProfile() error {
 
 
 func MemstatsStr() string {
-	p := os.Getpid()
-	statm, e := os.Open(fmt.Sprintf("/proc/%d/statm", p))
-	defer statm.Close()
-	if e != nil {
-		return e.Error()
-	}
-	statms, _ := ioutil.ReadAll(statm)
-	statmss := strings.Fields(string(statms))
-	if len(statmss) < 2 {
-		return string(statms)
-	}
-	m0, _ := strconv.ParseFloat(statmss[0], 64)
-	m1, _ := strconv.ParseFloat(statmss[1], 64)
-
-	return fmt.Sprintf("%8.1fmb // %8.1fmb", m0*4.0/1024.0, m1*4.0/1024.0)
+	//not possibile in windows??
+	return ""
 }
 
 func GetFileSize(fn string) (int64, error) {

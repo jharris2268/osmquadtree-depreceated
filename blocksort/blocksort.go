@@ -108,7 +108,7 @@ func AddData(
     abs.Flush()
     
     //debug.FreeOSMemory()
-    fmt.Printf("have %d objs in %d blocks\n", abs.TotalLen(), abs.NumBlocks())
+    
     return nil
 }
 

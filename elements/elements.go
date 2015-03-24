@@ -10,6 +10,7 @@ package elements
 import (
 	"github.com/jharris2268/osmquadtree/quadtree"
 	"time"
+    "strings"
 )
 
 // ElementType shows which type of openstreetmap entity is represented by
@@ -83,6 +84,13 @@ func (t Timestamp) DateString() string {
 	return time.Unix(int64(t), 0).UTC().Format("20060102")
 }
 
+func (t Timestamp) FileString(round bool) string {
+    if round {
+        return t.DateString()
+    }
+    return strings.Replace(t.String(), ":","-",-1)
+}
+
 // ReadDateString parses s as either short date form "20060102" or full
 // timestamp 2006-01-02T15:04:05
 func ReadDateString(s string) (Timestamp, error) {
@@ -124,7 +132,7 @@ type Info interface {
 	Changeset()     Ref
 	Uid()           int64
 	User()          string
-
+    Visible()       bool
 	Pack() []byte
 }
 

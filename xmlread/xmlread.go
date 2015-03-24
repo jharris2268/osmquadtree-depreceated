@@ -205,17 +205,17 @@ func ReadXmlBlocks(filename string) <-chan elements.ExtendedBlock {
 
                     switch tok.Name.Local {
                     case "node":
-                        info := elements.MakeInfo(tt.vs, tt.ts, tt.cs, tt.ui, tt.us)
+                        info := elements.MakeInfo(tt.vs, tt.ts, tt.cs, tt.ui, tt.us, tt.changeType!=elements.Delete)
                         tags := elements.MakeTags(tt.keys, tt.vals)
                         
                         ts=append(ts,elements.MakeNode(tt.id, info, tags, tt.lon,tt.lat, 0, tt.changeType))
                     case "way":
-                        info := elements.MakeInfo(tt.vs, tt.ts, tt.cs, tt.ui, tt.us)
+                        info := elements.MakeInfo(tt.vs, tt.ts, tt.cs, tt.ui, tt.us, tt.changeType!=elements.Delete)
                         tags := elements.MakeTags(tt.keys, tt.vals)
                         //data := osmread.MakeSimpleObjWayNodes(tt.refs)
                         ts=append(ts,elements.MakeWay(tt.id, info, tags, tt.refs, 0, tt.changeType))
                     case "relation":
-                        info := elements.MakeInfo(tt.vs, tt.ts, tt.cs, tt.ui, tt.us)
+                        info := elements.MakeInfo(tt.vs, tt.ts, tt.cs, tt.ui, tt.us, tt.changeType!=elements.Delete)
                         tags := elements.MakeTags(tt.keys, tt.vals)
                         //data := osmread.MakeSimpleObjRelMembers(tt.refs, tt.types, tt.roles)
                         ts=append(ts,elements.MakeRelation(tt.id, info, tags, tt.types,tt.refs,tt.roles, 0, tt.changeType))

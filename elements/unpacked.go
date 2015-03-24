@@ -263,6 +263,7 @@ type unpackedInfo struct {
 	cs   Ref
 	ui   int64
 	user string
+    vis  bool
 }
 
 func (upi *unpackedInfo) Version() int64       { return upi.vs }
@@ -270,13 +271,14 @@ func (upi *unpackedInfo) Timestamp() Timestamp { return upi.ts }
 func (upi *unpackedInfo) Changeset() Ref       { return upi.cs }
 func (upi *unpackedInfo) Uid() int64           { return upi.ui }
 func (upi *unpackedInfo) User() string         { return upi.user }
+func (upi *unpackedInfo) Visible() bool        { return upi.vis }
 
-func MakeInfo(vs int64, ts Timestamp, cs Ref, ui int64, user string) Info {
-	return &unpackedInfo{vs, ts, cs, ui, user}
+func MakeInfo(vs int64, ts Timestamp, cs Ref, ui int64, user string, vis bool) Info {
+	return &unpackedInfo{vs, ts, cs, ui, user,vis}
 }
 
 func (upt *unpackedInfo) Pack() []byte {
-	return packInfo(upt.vs, upt.ts, upt.cs, upt.ui, upt.user)
+	return packInfo(upt.vs, upt.ts, upt.cs, upt.ui, upt.user,upt.vis)
 }
 
 type packedGeometry struct {

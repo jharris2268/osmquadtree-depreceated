@@ -353,52 +353,19 @@ func CalcUpdateTiles(prfx string, xmlfn string, enddate elements.Timestamp, newf
         specs[i] = cache.FileSpec(i)
     }
     
-    //specs, qts,err := locationscache.GetCacheSpecs(prfx)
-    //if err!=nil { return nil,nil,err}
-    
-    
-
 	startdate := specs[len(specs)-1].Timestamp
 
 	if err != nil {
 		return nil, nil,err
 	}
 
-	//lcs := locationscache.GetTiles(prfx, iterObjIds(objQts, wayNodes))
     locs, tiles := cache.FindTiles(iterObjIds(objQts, wayNodes))
-
-/*
-	ts := map[int64]int{}
-	tsp := map[elements.Ref]int64{}
-
-	nvs, ivs := 0, 0
-	for c := range iterObjIds(objQts, wayNodes) {
-		k := c / 32
-		t, ok := lcs[k]
-		if ok {
-			if t[c%32] == 0 {
-				ivs += 1
-			} else {
-				ts[t[c%32]-1]++
-				tsp[elements.Ref(c)] = t[c%32] - 1
-			}
-
-		} else {
-			nvs += 1
-		}
-	}
-*/
-    
-    //println(len(locs), "locs", len(tiles),"tiles")
 
 
 	nfs := map[int64]srcBlock{}
 	for k, _ := range tiles {
 		i := int64(k.File)
 		if _, ok := nfs[i]; !ok {
-            //println(i,len(specs))
-            fmt.Println(i, specs[i])
-            
             
 			ss := srcBlock{}
 			ss.ts = specs[i].Timestamp
@@ -423,16 +390,8 @@ func CalcUpdateTiles(prfx string, xmlfn string, enddate elements.Timestamp, newf
         qts[i] = nfs[0].idx.Quadtree(i)
     }
     
-
-	//fmt.Printf("%d loctiles fetched. %d new vals, %d not present and %d tiles to load\n", lcs.Len(), nvs, ivs, len(ts))
-	//fmt.Printf("%d files present; %d qts\n", len(nfs), len(qts))
-	/*for k,s := range nfs {
-	      println(k, s.ts, s.fn, len(s.idx))
-	  }
-	  println("have",len(tsp),"tsp")*/
 	tempobjs, err := findExistingObjs(tiles, nfs, objQts, nodelocs, wayNodes,locs)
 	
-    //tsp = nil
 	if err != nil {
 		return nil, nil,err
 	}
@@ -458,7 +417,7 @@ func CalcUpdateTiles(prfx string, xmlfn string, enddate elements.Timestamp, newf
 					panic("")
                     continue
 				}
-				//wbx.Expand(wid,n.Lon(),n.Lat())
+				
                 bx.ExpandXY(n.lon,n.lat)
 			}
 			q,_ := quadtree.Calculate(*bx, 0.05, 18)
@@ -694,9 +653,6 @@ func CalcUpdateTiles(prfx string, xmlfn string, enddate elements.Timestamp, newf
 			nqi := qttree.Find(nqt)
 			nq := qttree.At(nqi).Quadtree
 
-			/*if o.ObjectId() == 2250146319 || o.ObjectId() == 2250146328 || o.ObjectId() == 2177704274 {
-				fmt.Printf("\nfound object %s: k=%d, t[oi%%32]=%d,oqt=%s oa=%d, oq=%s, nqt=%s, nq=%s\n", o.String(), k, t[oi%32], quadtree.QuadtreeString(o.Quadtree()), oa, quadtree.QuadtreeString(oq), quadtree.QuadtreeString(nqt), quadtree.QuadtreeString(nq))
-			}*/
 			if nq != oq {
 				allocs[oq] = append(allocs[oq], newChangeEle(o, 2, 0))
 			}
@@ -717,57 +673,26 @@ func CalcUpdateTiles(prfx string, xmlfn string, enddate elements.Timestamp, newf
 	
     if newfn != "" {
         o := len(specs)
-        
-		//iio := int64(len(specs)) << 32
+        for i, k := range ks {
 
-		for i, k := range ks {
-
-			//ii := int64(i) | iio
 			for _, v := range allocs[k] {
 				oi := packId(v)
                 
-                /*
-            
                 
-                
-				oa, ob := oi/32, oi%32
-				if _, ok := nlocs[oa]; !ok {
-					or, ok := lcs[oa]
-					if ok && len(or) == 32 {
-						nlocs[oa] = or[:]
-					} else {
-						nlocs[oa] = make([]int64, 32)
-					}
-				}*/
 				switch v.ChangeType() {
                     case 1:
-                        //nlocs[oa][ob] = 0
                         nlocs[oi] = locationscache.TilePair{-1,-1}
                     case 3, 4, 5:
-                        //nlocs[oa][ob] = ii + 1
                         nlocs[oi] = locationscache.TilePair{o,i}
 				}
 			}
 		}
 		
-        /*naz := 0
-		for _, v := range nlocs {
-			naz++
-			for _, vi := range v {
-				if vi != 0 {
-					naz--
-					break
-				}
-			}
-		}*/
+       
 		println("have", len(nlocs), "new locations")//, with", naz, "all zero??")
         
         idx := locationscache.IdxItem{len(specs),newfn,enddate,state}
-        
-		//println("AddNewEntries", prfx, len(nlocs), len(specs), enddate, newfn, state)
-		//locationscache.AddNewEntries(prfx, nlocs, len(specs), enddate, newfn, state)
         cache.AddTiles(nlocs, idx)
-        
         
 	}
     
@@ -776,13 +701,6 @@ func CalcUpdateTiles(prfx string, xmlfn string, enddate elements.Timestamp, newf
 		for i, k := range ks {
             vv := allocs[k]
             vv.Sort()
-            
-            /*if k==0 {
-                for _,o:=range vv {
-                    fmt.Println(o)
-                }
-            }*/
-            
 			res <- elements.MakeExtendedBlock(i, vv, k, startdate, enddate,nil )
 		}
 		close(res)

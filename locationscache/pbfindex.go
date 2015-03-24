@@ -160,7 +160,7 @@ func MakeLocationsCachePbfIndexzz(
     if err!=nil { panic(err.Error()) }
     defer outf.Close()
     
-    zz,err := writefile.WriteBlocks(grped[0], outf, addIndexBlock, false)
+    zz,err := writefile.WriteBlocks(grped[0], outf, addIndexBlock, false, false)
     if err!=nil {
         return err
     }

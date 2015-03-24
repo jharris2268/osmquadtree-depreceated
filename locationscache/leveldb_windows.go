@@ -27,7 +27,12 @@ func MakeLocationsCacheLevelDb(
 func OpenLevelDbLocationsCache(prfx string) (LocationsCache,error) {
     return nil, ldbNotDefined
 }
-func func GetCacheSpecsLevelDb(prfx string) ([]IdxItem, []quadtree.Quadtree, error) {
+func GetCacheSpecsLevelDb(prfx string) ([]IdxItem, []quadtree.Quadtree, error) {
     
     return nil,nil,ldbNotDefined
+}
+
+func GetLastStateLevelDb(prfx string) (int64, error) {
+    
+    return -1,ldbNotDefined
 }
