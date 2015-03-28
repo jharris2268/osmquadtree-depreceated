@@ -133,7 +133,7 @@ func WritePbfIndexed(inc <-chan elements.ExtendedBlock, outf io.Writer, tf io.Re
     }
     
     
-    ii,err := WriteBlocks(inc,tf,addBl,false,true)
+    ii,err := WriteBlocks(inc,tf,addBl,false,false)
     //ii,err := WriteBlocksOrdered(inc,tf,addBl)
     if err!=nil {
         return nil,err
@@ -145,7 +145,7 @@ func WritePbfIndexed(inc <-chan elements.ExtendedBlock, outf io.Writer, tf io.Re
 func writeUnIndexed(inc <- chan elements.ExtendedBlock, outf io.Writer, isc bool,
     addBl func(bl elements.ExtendedBlock,i int) (utils.Idxer,error) ) (write.BlockIdxWrite,error) {
     
-    ii,err := WriteBlocks(inc,outf,addBl,isc,true)
+    ii,err := WriteBlocks(inc,outf,addBl,isc,false)
         
     if err!=nil { return nil,err}
     if ii==nil {
@@ -248,7 +248,7 @@ func WritePbfFileM(inc []chan elements.ExtendedBlock, outfn string, isc bool) (w
         return addFullBlock(bl,i,isc,[]byte("OSMData"))
     }
     
-    ii,err := WriteBlocksOrdered(inc,tf,addBl,false)
+    ii,err := WriteBlocksOrdered(inc,tf,addBl,true)
     if err!=nil {
         return nil,err
     }

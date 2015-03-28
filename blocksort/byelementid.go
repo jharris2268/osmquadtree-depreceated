@@ -24,7 +24,6 @@ func SortElementsById(
 
     
     //toSort:=make(chan elements.ExtendedBlock)
-    
     addf := func(idx int, al int,bl elements.Block) (elements.ExtendedBlock, error) {
         return elements.MakeExtendedBlock(idx,bl, quadtree.Null, 0, endDate,nil),nil
     }
@@ -90,7 +89,7 @@ func GroupTiles(sorted <-chan elements.ExtendedBlock, groupSize int, endDate ele
                 if len(pp)==groupSize {
                     
                     if (ii % 1373)==0 {
-                        fmt.Printf("%-4d %-8d %-40s %-40s %s\n", ii, len(pp), pp[0], pp[len(pp)-1],utils.MemstatsStr())
+                        fmt.Printf("\r%-4d %-8d %-40s %-40s %s", ii, len(pp), pp[0], pp[len(pp)-1],utils.MemstatsStr())
                     }
                     
                     res[ii%nc] <- elements.MakeExtendedBlock(ii, pp, 0,0,endDate,nil)
@@ -105,9 +104,11 @@ func GroupTiles(sorted <-chan elements.ExtendedBlock, groupSize int, endDate ele
 
     
         if len(pp)>0 {
-            fmt.Printf("%-4d %-8d %-40s %-40s %s: %0.1fs sending\n", ii, len(pp), pp[0], pp[len(pp)-1],utils.MemstatsStr(),tt)
+            fmt.Printf("\r%-4d %-8d %-40s %-40s %s: %0.1fs sending\n", ii, len(pp), pp[0], pp[len(pp)-1],utils.MemstatsStr(),tt)
             res[ii%nc] <- elements.MakeExtendedBlock(ii, pp, 0,0,endDate,nil)
             ii++
+        } else {
+            fmt.Println()
         }
 
     

@@ -18,9 +18,6 @@ type origChangePair struct {
 
 func mergeOrigChange(idx int, orig elements.ExtendedBlock, chg elements.ExtendedBlock) elements.ExtendedBlock {
 	
-	if (orig==nil || orig.Len() == 0) && (chg==nil || chg.Len() == 0) {
-		return elements.MakeExtendedBlock(idx,nil,0,0,0,nil)
-	}
 	if (chg==nil || chg.Len() == 0) {
 		return orig
 	}

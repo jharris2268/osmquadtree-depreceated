@@ -226,7 +226,7 @@ func FindObjsFilter(inblocks <-chan elements.ExtendedBlock, locTest LocTest, ids
 func filterRelMembers(o elements.Element, ids IdSet) elements.Element {
 	rel := o.(elements.FullElement)
     mm  := rel.(elements.Members)
-	if mm.Len() == 0 {
+	if mm.Len()==0 && o.ChangeType() == 0 {
 		return nil
 	}
 	rr, tt, rl := make([]elements.Ref, 0, mm.Len()), make([]elements.ElementType, 0, mm.Len()), make([]string, 0, mm.Len())
@@ -240,7 +240,7 @@ func filterRelMembers(o elements.Element, ids IdSet) elements.Element {
 	if len(rr) == mm.Len() {
 		return o
 	}
-	if len(rr) == 0 {
+	if len(rr) == 0 && o.ChangeType() == 0 {
 		return nil
 	}
 	return elements.MakeRelation(
@@ -259,7 +259,9 @@ func filterBlock(bl elements.ExtendedBlock, ids IdSet) elements.ExtendedBlock {
             if e.Type()==elements.Relation {
                 e = filterRelMembers(e, ids)
             }
-            ee=append(ee, e)
+            if e!=nil {
+                ee=append(ee, e)
+            }
         }
     }
     return elements.MakeExtendedBlock(

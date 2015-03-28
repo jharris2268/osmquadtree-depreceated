@@ -220,12 +220,13 @@ func findExistingObjs(ts locationscache.TilePairSet, nfs map[int64]srcBlock,
 			}
 
 			fps := make(int64slice, 0, ss.idx.Len())
-
+            isc:=false
 			for t, _ := range ts {
 				if (t.File) == i {
 					//println(t,i,t&0xffffffff,len(ss.idx))
 					fp := ss.idx.Filepos(t.Tile)
 					fps = append(fps, fp)
+                    isc = isc || ss.idx.IsChange(t.Tile)
 
 				}
 			}
@@ -234,7 +235,7 @@ func findExistingObjs(ts locationscache.TilePairSet, nfs map[int64]srcBlock,
 			fmt.Printf("load %d tiles from %s\n", len(fps), ss.fn)
 			
             
-            bll,err := readfile.ReadExtendedBlockMultiSortedPartial(ss.fn,4,fps)
+            bll,err := readfile.ReadExtendedBlockMultiSortedPartial(ss.fn,4,fps, isc)
             
             if err != nil {
 				panic(err.Error())

@@ -124,8 +124,62 @@ func ReadExtendedBlockMultiMerge(origfn string, chgfns []string, nc int) ([]chan
         
 }
 
+func ReadExtendedBlockMultiMergeQtsSingleFile(origfn string, nc int, passQt func(quadtree.Quadtree) bool) ([]chan elements.ExtendedBlock, error) {
+    
+    
+    orig := make(chan elements.ExtendedBlock,20)
+    chgs := make(chan []elements.ExtendedBlock)
+    
+    go func() {
+        defer close(orig)
+        defer close(chgs)
+        aa := make([]elements.ExtendedBlock, 0, 30)
+        blcks,_ := ReadExtendedBlockMultiSortedQts(origfn, nc, passQt)
+        
+        b0 := <- blcks
+        if b0==nil {
+            return
+        }
+        aa = append(aa, b0)
+        ni:=0
+        for bl := range blcks {
+            if bl.Quadtree()!=aa[0].Quadtree() {
+                
+                aa[0].SetIdx(ni)
+                
+                orig <- aa[0]
+                if len(aa)>1 {
+                    chgs <- aa[1:]
+                } else {
+                    chgs <- []elements.ExtendedBlock{elements.MakeExtendedBlock(ni,nil,aa[0].Quadtree(),0,0,nil)}
+                }
+                ni++
+                
+                aa=make([]elements.ExtendedBlock,0,30)
+            }
+            aa=append(aa, bl)
+        }
+        orig <- aa[0]
+        if len(aa)>1 {
+            chgs <- aa[1:]
+        }
+    }()
+    merged,err:= change.MergeChange(chgs)
+    if err!=nil { return nil, err }
+    
+    return change.MergeOrigAndChange(orig,merged,nc)
+        
+}
+            
+    
+
 
 func ReadExtendedBlockMultiMergeQts(origfn string, chgfns []string, nc int, passQt func(quadtree.Quadtree) bool) ([]chan elements.ExtendedBlock, error) {
+    
+    if len(chgfns)==0 {
+        return ReadExtendedBlockMultiMergeQtsSingleFile(origfn, nc, passQt)
+    }
+    
     
     getBlocks := func(s string) <-chan elements.ExtendedBlock {
         nc:=1

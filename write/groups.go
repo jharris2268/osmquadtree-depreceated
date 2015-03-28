@@ -37,6 +37,7 @@ func groupElements(bl elements.Block, ischange bool) []intPair {
     for li < bl.Len() {
         ct,ty := getct(li), getty(li)
         i:=li+1
+        
         for i < bl.Len() && getct(i)==ct && getty(i)==ty {
             i++
         }
@@ -47,12 +48,37 @@ func groupElements(bl elements.Block, ischange bool) []intPair {
     return ans
 }   
 
+func dropNils(bl elements.Block) elements.Block {
+    nb:=make(elements.ByElementId, 0, bl.Len())
+    hasn:=false
+    for i:=0; i < bl.Len(); i++ {
+        e:=bl.Element(i)
+        if e==nil {
+            hasn=true
+            ble,ok := bl.(elements.ExtendedBlock)
+            if ok {
+                println("have null: ",ble.Idx(), " ", ble.Quadtree().String(), ": ", i, "/",bl.Len())
+            } else {
+                println("have null: ", i, "/",bl.Len())
+            }
+        } else {
+            nb=append(nb,e)
+        }
+    }
+    if hasn {
+        return nb
+    }
+    return bl
+}
+
 func packBlock(bl elements.Block, stm map[string]int, ischange bool, writeExtra bool) (utils.PbfMsgSlice, error) {
-    ss := groupElements(bl,ischange)
+    bl2 := dropNils(bl)
+    
+    ss := groupElements(bl2,ischange)
     ans := make(utils.PbfMsgSlice, 0, len(ss)+10)
     
     for i,s := range ss {
-        pg,err := packGroup(bl, stm, s.f, s.t, s.ct, writeExtra)
+        pg,err := packGroup(bl2, stm, s.f, s.t, s.ct, writeExtra)
         if err!=nil { return nil,err }
         ans = append(ans, utils.PbfMsg{2,pg,uint64(i)})
     }

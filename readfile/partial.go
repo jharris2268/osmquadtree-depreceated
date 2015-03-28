@@ -45,39 +45,41 @@ func GetHeaderBlock(fn string) (*os.File, *read.HeaderBlock,error) {
 }
 
 
-func MakeFileBlockChanSplitPartial(fn string, nc int, locs []int64) ([]<-chan pbffile.FileBlock, bool, error) {
+func MakeFileBlockChanSplitPartial(fn string, nc int, locs []int64) ([]<-chan pbffile.FileBlock, error) {
     fl,err := os.Open(fn)
-    if err!=nil { return nil,false,err}
-    isc:=strings.HasSuffix(fn,"pbfc")
-    return pbffile.ReadPbfFileBlocksDeferSplitPartial(fl, locs, nc), isc, nil
+    if err!=nil { return nil,err}
+    //isc:=strings.HasSuffix(fn,"pbfc")
+    return pbffile.ReadPbfFileBlocksDeferSplitPartial(fl, locs, nc), nil
 }
 
-func getPartialLocs(fn string, passQt func(quadtree.Quadtree) bool) ([]int64, error) {
-    
+func getPartialLocs(fn string, passQt func(quadtree.Quadtree) bool) ([]int64, bool, error) {
+    isc := strings.HasSuffix(fn,"pbfc")
     _,hb,err := GetHeaderBlock(fn)
     if err!=nil {
-        return nil,err
+        return nil,false,err
     }
     locs:=make([]int64,0,hb.Index.Len())
     for i:=0; i < hb.Index.Len(); i++ {
         q:=hb.Index.Quadtree(i)
         if passQt(q) {
             locs=append(locs, hb.Index.Filepos(i))
+            isc = isc || hb.Index.IsChange(i)
         }
     }
-    return locs,nil
+    return locs,isc,nil
 }
 
 func ReadExtendedBlockMultiSortedQts(fn string, nc int, passQt func(quadtree.Quadtree) bool) (<-chan elements.ExtendedBlock, error) {
     
-    locs,err := getPartialLocs(fn, passQt)
+    locs,isc, err := getPartialLocs(fn, passQt)
     if err!=nil { return nil,err }
-    return ReadExtendedBlockMultiSortedPartial(fn,nc,locs)
+    return ReadExtendedBlockMultiSortedPartial(fn,nc,locs,isc)
 }
 
 
-func ReadExtendedBlockMultiSortedPartial(fn string, nc int, locs []int64) (<-chan elements.ExtendedBlock, error) {    
-    blocks,isc,err := MakeFileBlockChanSplitPartial(fn,nc,locs)
+func ReadExtendedBlockMultiSortedPartial(fn string, nc int, locs []int64, isc bool) (<-chan elements.ExtendedBlock, error) { 
+       
+    blocks,err := MakeFileBlockChanSplitPartial(fn,nc,locs)
     if err!=nil { return nil,err }
     
     return ReadDataMultiSorted(blocks,isc, read.ReadExtendedBlock)
