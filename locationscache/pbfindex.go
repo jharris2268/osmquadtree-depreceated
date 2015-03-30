@@ -12,15 +12,16 @@ import (
     "fmt"
     "sync"
     "sort"
+    "time"
     
     "github.com/jharris2268/osmquadtree/utils"
     "github.com/jharris2268/osmquadtree/readfile"
     "github.com/jharris2268/osmquadtree/pbffile"
     "github.com/jharris2268/osmquadtree/elements"
     
-    "github.com/jharris2268/osmquadtree/read"
-    "github.com/jharris2268/osmquadtree/blocksort"
-    "github.com/jharris2268/osmquadtree/writefile"
+    //"github.com/jharris2268/osmquadtree/read"
+    //"github.com/jharris2268/osmquadtree/blocksort"
+    //"github.com/jharris2268/osmquadtree/writefile"
     "github.com/jharris2268/osmquadtree/quadtree"
 
 )
@@ -114,63 +115,6 @@ func addIndexBlock(bl elements.ExtendedBlock, i int) (utils.Idxer,error) {
     return &idxData{bl.Idx(),quadtree.Null,dd},nil
 }
 
-
-func MakeLocationsCachePbfIndexzz(
-    inChans []chan elements.ExtendedBlock, infn string, prfx string,
-    endDate elements.Timestamp, state int64) error {
-    
-    
-    tiles,qq := IterObjectLocations(inChans,1<<16, 1)
-    sorted := make(chan elements.ExtendedBlock)
-    
-    
-    
-    go func() {
-        i:=0
-        for bl := range tiles {
-            uu,_ := utils.ReadDeltaPackedList(bl.B)
-            tt := make(elements.ByElementId, 0, 65536)
-            
-            t:=elements.Node
-            o:=elements.Ref(bl.K&0xffffffff)*65536
-            switch bl.K>>43 {
-                case 1: t=elements.Way
-                case 2: t=elements.Relation
-            }
-            
-            for i,u := range uu {
-                if u!=0 {
-                    tt=append(tt, read.MakeObjQt(t,o+elements.Ref(i),quadtree.Quadtree(u-1)))
-                }
-            }
-            if len(tt)>0 {
-                sorted <- elements.MakeExtendedBlock(i, tt, 0,0,0,nil)
-                i+=1
-            }
-        }
-        close(sorted)
-    }()
-    
-    
-    grped, err := blocksort.GroupTiles(sorted, 100000,0,1)
-    if err!=nil { panic(err.Error()) }
-    
-    
-    outf,err := os.Create(prfx+infn+"-index.pbf")
-    if err!=nil { panic(err.Error()) }
-    defer outf.Close()
-    
-    zz,err := writefile.WriteBlocks(grped[0], outf, addIndexBlock, false, false)
-    if err!=nil {
-        return err
-    }
-    
-    fmt.Println("have", len(zz), "tiles", len(qq), "qts", utils.MemstatsStr())
-    
-    
-    writeSpecs(prfx, []IdxItem{IdxItem{0,infn,endDate,state}}, []int{len(qq)})
-    return nil
-}
 
 func MakeLocationsCachePbfIndex(
     inChans []chan elements.ExtendedBlock, infn string, prfx string,
@@ -269,11 +213,13 @@ func (fflc *idxLocationsCache) FindTiles(inc <-chan int64) (Locs,TilePairSet) {
         ll[elements.Ref(ii)]=TilePair{-1,-1}
     }
     
+    st:=time.Now()
+    
     for fl,idx := range fflc.idx {
         
         
         fn := fflc.prfx+idx.Filename+"-index.pbf"
-        fmt.Println("scan",fn)
+        fmt.Printf("\r%-8.1fs: %-2d scan %40s", time.Since(st).Seconds(),fl,fn)
         fbs,_,err := readfile.MakeFileBlockChanSplit(fn,4)
         if err!=nil { panic(err.Error()) }
         ts := make([]map[elements.Ref]int64, 4)
@@ -306,6 +252,7 @@ func (fflc *idxLocationsCache) FindTiles(inc <-chan int64) (Locs,TilePairSet) {
         
         
     }
+    fmt.Printf("\r%-8.1fs: scanned %d files\n", time.Since(st).Seconds(),len(fflc.idx))
     for _,v := range ll {
         if v.File>=0 {
             tm[v] = true

@@ -16,7 +16,7 @@ import (
 
 	"fmt"
 	"sort"
-	//"time"
+	"time"
 
 	//"runtime/debug"
 )
@@ -212,6 +212,8 @@ func findExistingObjs(ts locationscache.TilePairSet, nfs map[int64]srcBlock,
 	}
 	incc := make(chan blii)
 	go func() {
+        st:=time.Now()
+        tt:=0
 		for i := 0; i <= mxS; i++ {
 			ss, ok := nfs[int64(i)]
 			
@@ -232,8 +234,8 @@ func findExistingObjs(ts locationscache.TilePairSet, nfs map[int64]srcBlock,
 			}
 			sort.Sort(fps)
 
-			fmt.Printf("load %d tiles from %s\n", len(fps), ss.fn)
-			
+			fmt.Printf("\r%-6.1f: load %8d tiles from %30s", time.Since(st).Seconds(),len(fps), ss.fn)
+			tt+=len(fps)
             
             bll,err := readfile.ReadExtendedBlockMultiSortedPartial(ss.fn,4,fps, isc)
             
@@ -247,6 +249,7 @@ func findExistingObjs(ts locationscache.TilePairSet, nfs map[int64]srcBlock,
             
 			
 		}
+        fmt.Printf("\r%-8.1fs: loaded %8d tiles%50s\n",time.Since(st).Seconds(),tt,"")
 		close(incc)
 	}()
 
@@ -282,7 +285,7 @@ func findExistingObjs(ts locationscache.TilePairSet, nfs map[int64]srcBlock,
 
 	}()
     
-    println("have",len(nodeLocs),"nodeLocs")
+    //println("have",len(nodeLocs),"nodeLocs")
     
 	tos := map[elements.Ref]int{}
 	cc := 0
@@ -294,11 +297,7 @@ func findExistingObjs(ts locationscache.TilePairSet, nfs map[int64]srcBlock,
 				if ok { //&& ot.Info().Version()>=o.Info().Version() {
 					panic(fmt.Sprintf("[%d] all ready have added obj %s @ %d", cc, o.String(), pp))
 				} else {
-					//op := osmread.SimpleObjPacked(o.Pack())
-                    switch oi {
-                        case 16485399,966008526,959485761,2189869964:
-                            println(o.String())
-                    }
+					
 					tempobjs.add(o)
                     ll := o.(elements.LonLat)
                     
@@ -310,7 +309,7 @@ func findExistingObjs(ts locationscache.TilePairSet, nfs map[int64]srcBlock,
 			}
 		}
 	}
-    println("have",len(nodeLocs),"nodeLocs")
+    //println("have",len(nodeLocs),"nodeLocs")
 	
 	sort.Sort(tempobjs)
 	
@@ -396,7 +395,7 @@ func CalcUpdateTiles(prfx string, xmlfn string, enddate elements.Timestamp, newf
 	if err != nil {
 		return nil, nil,err
 	}
-	println(tempobjs.Len(), len(nodelocs))
+	//println(tempobjs.Len(), len(nodelocs))
 
 	nqts := objQtMap{}
 	qss := 0
@@ -533,7 +532,7 @@ func CalcUpdateTiles(prfx string, xmlfn string, enddate elements.Timestamp, newf
 		}
 	}
 
-	println(len(objQts))
+	//println(len(objQts))
 	qttree := calcqts.MakeQtTree(qts)
 
 	qtsl := map[int64]quadtree.Quadtree{}
@@ -545,7 +544,7 @@ func CalcUpdateTiles(prfx string, xmlfn string, enddate elements.Timestamp, newf
 		}
 	}
 	println("qttree.Len()=", qttree.Len(), "len(qtsl)=", len(qtsl))
-    zzzz:=0
+    
 	nodel, nomod := 0, 0
 	createexisting := 0
 	allocs := map[quadtree.Quadtree]elements.ByElementId{}
@@ -575,12 +574,7 @@ func CalcUpdateTiles(prfx string, xmlfn string, enddate elements.Timestamp, newf
 		}
 		nqt, nqtok := objQts[oi]
         
-        if nqt<0 && o.ChangeType() != 5 {
-            if zzzz<25 {
-                println("??", oi>>59,oi&0xffffffffff,nqt, o.ChangeType().String())
-                zzzz++
-            }
-        }
+        
         
 		nq := quadtree.Null
 		if !nqtok {

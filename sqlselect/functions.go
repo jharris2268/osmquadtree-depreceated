@@ -97,6 +97,31 @@ func (ce *concatExpr) Value(row Row) Value {
 	return stringValue(lv.AsString() + rv.AsString())
 }
 
+func concatFunc(cols []Rower, row Row) Value {
+    if len(cols)==0 {
+        return nullValue()
+    }
+    if len(cols)==1 {
+        v := cols[0].Value(row)
+        if v.IsNull() || v.Type()!="STRING" {
+            return nullValue()
+        }
+        return v
+    }
+    
+    a := cols[0].Value(row)
+    if a.IsNull() || a.Type() !="STRING" {
+        return nullValue()
+    }
+    b := concatFunc(cols[1:], row)
+    if b.IsNull() || b.Type() !="STRING" {
+        return nullValue()
+    }
+    return stringValue(a.AsString()+b.AsString())
+}
+    
+    
+
 type mathExpr struct {
 	ll, rr Rower
 	op     string
@@ -272,6 +297,8 @@ func (fe *funcExpr) Value(row Row) Value {
 		return charlengthFunc(fe.exprs, row)
 	case "makeinteger":
 		return makeintegerFunc(fe.exprs, row)
+    case "concat":
+        return concatFunc(fe.exprs, row)
 	default:
 		println("unexpected function:", fe.name)
 	}
