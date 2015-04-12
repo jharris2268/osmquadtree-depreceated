@@ -41,7 +41,7 @@ type Quadtree int64
 
 const Null = Quadtree(-1)
 
-
+//func (q Quadtree) MarshalJSON() ([]byte, error) { return []byte(q.String()),nil }
 
 
 

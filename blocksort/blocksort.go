@@ -21,12 +21,15 @@ type IdPacked struct {
     Data []byte
 }
 
+/*A collection of IdPacked structs, perhaps as a slice*/
 type IdPackedList interface {
     Len()     int
     At(i int) IdPacked
 }
 
-
+/*A BlockStore accepts many calls to Add, storing blobs of data, perhaps
+in a temporary file, until Flush is called. The stored data is then retreived
+by calling All*/
 type BlockStore interface {
     Add(IdPacked)
     Len()   int
@@ -39,12 +42,17 @@ type BlockStore interface {
 
 
 type BlockStoreAllocPair struct {
-    alloc   int
-    block   BlockStore
-    idx     int
+    Alloc   int
+    Block   BlockStore
+    Idx     int
 }
 
-
+/*An AllocBlockStore accepts many calls to Add, storing blobs of data,
+perhaps into one or more temporary files, until Flush is called. The
+stored data is then retrieved by calling Iter(), which returns a channel
+of BlockStoreAllocPair. The BlockStore contains all the blobs with the
+given key Alloc. The channel is sorted by Alloc. Iter can be called more
+than once. When finished, call Finish to remove any temporary files created.*/
 type AllocBlockStore interface {
     Add(IdPacked)
     NumBlocks() int
@@ -56,7 +64,20 @@ type AllocBlockStore interface {
 }
 
 
+/*MakeAllocBlockStore creates a new AllocBlockStore. ty must be one of:
+ * "block": a simple map of slices of blobs
+ * "tempfile": data is written to a temporary file (buffered into blocks of 64kb)
+ * "tempfilesplit": group allocs by groups of 100, (buffered into blocks of 1mb),
+        and split into several temporary files, each with 500 of these larger
+        groups.
+ * "tempfileslim": group allocs by groups of 500, (buffered into blocks of 64kb),
+        with each written to its own temporary file.
 
+tempfilesplit is the best option for spliting a planet file into blocks,
+tempfileslim is the best option for sorting back to by element id order.
+Temporary files are stored in the current directory, prefixed by
+osmquadtree.blocksort. When spliting/sorting a full planet file (~28gb),
+approximately 40gb of disk space will be used.*/
 func MakeAllocBlockStore(ty string) AllocBlockStore {
     
     switch ty {
@@ -65,21 +86,22 @@ func MakeAllocBlockStore(ty string) AllocBlockStore {
             bsw := newBlockStoreWriterIdx(false, 64*1024)
             return newMapAllocBlockStore(bsw.MakeNew, bsw.Finish)
         case "tempfilesplit":
-            bsw := newBlockStoreWriterSplit(100, 2*1024*1024)
+            bsw := newBlockStoreWriterSplit(100, 1*1024*1024)
             abs := newMapAllocBlockStoreSplit(bsw.MakeNew,500,bsw.Finish)
-    
-            return &groupAllocBlockStore{abs}
+            return abs
+            //return &groupAllocBlockStore{abs}
         case "tempfileslim":
             bsw := newBlockStoreWriterSplit(500,64*1024)
             abs := newMapAllocBlockStoreSplit(bsw.MakeNew,1,bsw.Finish)
-    
-            return &groupAllocBlockStore{abs}
+            return abs
+            //return &groupAllocBlockStore{abs}
     }
     panic("incorrect ty "+ty)
     return nil
 }
     
-            
+/*AddData calls addFunc on each block in the input channels, and adds the
+the resultant blobs to the AllocBlockStore abs*/ 
 func AddData(
     abs AllocBlockStore,
     inChans []chan elements.ExtendedBlock,
@@ -113,8 +135,9 @@ func AddData(
 }
 
 
-
-func ReadData(abs AllocBlockStore, nc int, outputFunc func(int,int,int,IdPackedList) error) error {
+/*ReadData calls abs.Iter, spliting the data into nc parallel channels,
+and calling outputFunc(channelidx int, data BlockStoreAllocPair) on each blob*/
+func ReadData(abs AllocBlockStore, nc int, outputFunc func(int,BlockStoreAllocPair) error) error {
     itr := abs.Iter()
     wg:=sync.WaitGroup{}
     wg.Add(nc)
@@ -125,7 +148,7 @@ func ReadData(abs AllocBlockStore, nc int, outputFunc func(int,int,int,IdPackedL
     }
     go func() {
         for bl:=range itr {
-            zz[bl.idx%nc] <- bl
+            zz[bl.Idx%nc] <- bl
         }
         for _,z:=range zz {
             close(z)
@@ -135,7 +158,7 @@ func ReadData(abs AllocBlockStore, nc int, outputFunc func(int,int,int,IdPackedL
     for i:=0; i < nc; i++ {
         go func(i int) {
             for bl := range zz[i] {
-                err:=outputFunc(i,bl.idx,bl.alloc,bl.block.All())
+                err:=outputFunc(i,bl)
                 if err!=nil {
                     panic(err.Error())
                 }
@@ -149,12 +172,12 @@ func ReadData(abs AllocBlockStore, nc int, outputFunc func(int,int,int,IdPackedL
     return nil
 }
 
-    
+/*SortByTile calls AddData, ReadData and abs.Finish()*/
 func SortByTile(
     inChans []chan elements.ExtendedBlock,
     addFunc func(elements.ExtendedBlock,chan IdPacked) error,
     nc int,
-    outputFunc func(int,int,int,IdPackedList) error,
+    outputFunc func(int,BlockStoreAllocPair) error,
     abs AllocBlockStore) error {
 
     AddData(abs,inChans,addFunc)
@@ -168,18 +191,25 @@ func SortByTile(
 type Allocater func(elements.Element) int
 
 func makeByElementId(ipl IdPackedList) elements.ByElementId {
-    ans := make(elements.ByElementId, ipl.Len())
+    ans := make(elements.ByElementId, 0, ipl.Len())
     
-    for i,_ := range ans {
+    for i:=0; i < ipl.Len(); i++  {
         ip := ipl.At(i)
-        ans[i] = elements.UnpackElement(ip.Data)
+        if ip.Data==nil {
+            println("??? null obj")
+        }
+        ans = append(ans, elements.UnpackElement(ip.Data))
     }
     ans.Sort()
     return ans
 }
 
 func makeIdPacked(alloc Allocater, o elements.Element) IdPacked {
-    return IdPacked{alloc(o), o.Pack()}
+    op := o.Pack()
+    if op==nil {
+        println("???", o, o.String(), "=>", string(op))
+    }
+    return IdPacked{alloc(o), op}
 }
     
 func addToPackedPairBlock(bl elements.ExtendedBlock, alloc Allocater, res chan IdPacked) error {
@@ -191,12 +221,20 @@ func addToPackedPairBlock(bl elements.ExtendedBlock, alloc Allocater, res chan I
     return nil
 }
  
-
+/*SortElementsByAlloc creates an AllocBlockStore of given absType, and
+then uses SortByTile to rearrange the input data inChans into groups
+given by the Allocater [func(element.Element) int)] function alloc
+(eg. by by using a calcqts.QtTree to find the group for an element's
+Quadtree). The sorted data blocks are created using
+makeBlock(idx int, alloc int, data elements.Block) (this can be used to
+add the block Quadtree value for a given alloc) and written to nc parallel
+output channels. If an absType of "inmem" is given, SortInMem is called
+instead.*/
 func SortElementsByAlloc(
         inChans []chan elements.ExtendedBlock,
         alloc Allocater,
         nc int,
-        makeBlock func(int, int,elements.Block) (elements.ExtendedBlock, error),
+        makeBlock func(int, int, elements.Block) (elements.ExtendedBlock, error),
         absType string) ([]chan elements.ExtendedBlock, error) {
     
     if absType == "inmem" {
@@ -214,9 +252,9 @@ func SortElementsByAlloc(
         res[i] = make(chan elements.ExtendedBlock)
     }
         
-    outputFunc := func(i int, idx int, al int, all IdPackedList) error {
-        pp := makeByElementId(all)
-        bl,err := makeBlock(idx, al, pp)
+    outputFunc := func(i int, blob BlockStoreAllocPair) error {
+        pp := makeByElementId(blob.Block.All())
+        bl,err := makeBlock(blob.Idx, blob.Alloc, pp)
         if err!=nil { return err }
         res[i] <- bl
         return nil
@@ -235,18 +273,6 @@ func SortElementsByAlloc(
     return res,nil
 }
 
-      
-
-            
-                    
-                
-            
-    
-
-    
-    
-        
-        
     
     
 

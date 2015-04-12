@@ -26,7 +26,7 @@ type idxData struct {
 }
 func (id idxData) Idx() int { return id.i }
 
-func WriteOsmJson(sblc <-chan utils.Idxer, outfn string, header string, footer string) (int, int, error) {
+func writeOsmJson(sblc <-chan utils.Idxer, outfn string, header string, footer string) (int, int, error) {
 
 	fmt.Println("outfn: ", outfn)
 	var outfz io.Writer
@@ -135,6 +135,8 @@ func MakeFeatureCollection(bl elements.ExtendedBlock, asMerc bool) map[string]in
 	return bll
 }
 
+//Write a stream of elements.ExtendedBlock, containing Geometry elements,
+//to outfn as a GeoJson file
 func WriteGeoJson(sblc <-chan elements.ExtendedBlock, outfn string) (int, int, error) {
 	outc := make(chan utils.Idxer)
 	go func() {
@@ -151,6 +153,6 @@ func WriteGeoJson(sblc <-chan elements.ExtendedBlock, outfn string) (int, int, e
 		}
 		close(outc)
 	}()
-	return WriteOsmJson(outc, outfn, `{"type": "FeatureCollection","features":[`+"\n", "\n]}")
+	return writeOsmJson(outc, outfn, `{"type": "FeatureCollection","features":[`+"\n", "\n]}")
 }
 

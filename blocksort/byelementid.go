@@ -16,7 +16,12 @@ import (
 )
 
 
-
+/*SortElementsById calls SortElementsByAlloc using an alloc function which
+divides the elements id by 1<<14 for nodes, 1<<11 for ways and 1<<9 for
+relations. The ouput data is then grouped into uniform sized groups
+of groupSize elements, into nc parallel channels. This can be used to
+convert tiled osm data back into the conventional form expected by most
+applications.*/
 func SortElementsById(
         inChans []chan elements.ExtendedBlock,
         nc int,
@@ -63,6 +68,7 @@ func sortAndGroupTiles(toSort <-chan elements.ExtendedBlock, groupSize int, endD
     return GroupTiles(sorted,groupSize,endDate,nc)
 }
 
+/*GroupTiles splits a sorted (by element id) input channel into even sized blocks of groupSize elements, written to nc channels*/
 func GroupTiles(sorted <-chan elements.ExtendedBlock, groupSize int, endDate elements.Timestamp, nc int) ([]chan elements.ExtendedBlock, error) {
     
     res := make([]chan elements.ExtendedBlock, nc)

@@ -19,10 +19,12 @@ type origChangePair struct {
 func mergeOrigChange(idx int, orig elements.ExtendedBlock, chg elements.ExtendedBlock) elements.ExtendedBlock {
 	
 	if (chg==nil || chg.Len() == 0) {
+        // no change block: return orig
 		return orig
 	}
 
 	if (orig==nil || orig.Len() == 0) {
+        // no orig block: drop deletes from change
 		return elements.MakeExtendedBlock(idx, elements.AsNormalBlock(chg), chg.Quadtree(), chg.StartDate(), chg.EndDate(), chg.Tags())
 	}
 	
@@ -39,20 +41,22 @@ func mergeOrigChange(idx int, orig elements.ExtendedBlock, chg elements.Extended
 			if s.A == nil {
 				println("???")
 			} else {
+                // no change object: pick orig
 				objects = append(objects, s.A)
 			}
 		} else if s.B.ChangeType() > 2 {
-            //println(s.b.String())
+            // change object a move, modify or create, so pick thsi
             objects=append(objects, elements.AsNormal(s.B))
 		} else {
             if s.B.ChangeType()==elements.Delete || s.B.ChangeType()==elements.Remove {
-                //pass
+                // change object a delete or remove, so pick neither
             } else {
+                // a normal object in the change block: shouldn't happen 
                 println("??",s.B.ChangeType()>2,s.B.ChangeType(),s.B.String())
             }
         }
 	}
-    //fmt.Println(orig.Len(),"+",chg.Len(),"=",objects.Len())
+    
 	return elements.MakeExtendedBlock(idx, objects, orig.Quadtree(), 0, chg.EndDate(), orig.Tags())
 }
 
@@ -74,24 +78,20 @@ func MergeOrigAndChange(orig <-chan elements.ExtendedBlock, cbs <-chan elements.
 		for aok || bok {
             
 			if !bok {
-                //println(i,a.Quadtree().String(),a.Len(),"nil")
-				pp[i%nc] <- origChangePair{i, a, nil}
-                
+                // no changes left
+				pp[i%nc] <- origChangePair{i, a, nil}                
 				a, aok = <-orig
 			} else if !aok {
-                //println(i,b.Quadtree().String(),"nil",b.Len())
+                // no origs left
 				pp[i%nc] <- origChangePair{i, nil, b}
 				b, bok = <-cbs
 			} else if a.Quadtree() < b.Quadtree() {
-				//println(i,a.Quadtree().String(),a.Len(),"nil")
                 pp[i%nc] <- origChangePair{i, a, nil}
 				a, aok = <-orig
 			} else if a.Quadtree() > b.Quadtree() {
-                //println(i,b.Quadtree().String(),"nil",b.Len())
 				pp[i%nc] <- origChangePair{i, nil, b}
 				b, bok = <-cbs
 			} else {
-                //println(i,b.Quadtree().String(),a.Len(),b.Len())
 				pp[i%nc] <- origChangePair{i, a, b}
 				a, aok = <-orig
 				b, bok = <-cbs
@@ -108,8 +108,6 @@ func MergeOrigAndChange(orig <-chan elements.ExtendedBlock, cbs <-chan elements.
         res[i] = make(chan elements.ExtendedBlock)
         go func(i int) {
             for ocp := range pp[i] {
-                
-                //fmt.Println(ocp.idx,ocp.orig,ocp.chg)
                 rr:=mergeOrigChange(ocp.idx,ocp.orig, ocp.chg)
                 res[i] <- rr
             }

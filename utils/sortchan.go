@@ -25,12 +25,15 @@ func SortIdxerChan(inc <-chan Idxer) <-chan Idxer {
 					nv++
 					s, ok = tt[nv]
 				}
-			} else {
+			} else if b.Idx() < nv {
+                println("??WTF??",b.Idx(), nv)
+                res <- b
+            } else {
 				tt[b.Idx()] = b
 			}
-			/*if len(tt) > 2000 {
+			if len(tt) > 2000 {
 				println("len(tt)=", len(tt), ", nv=", nv)
-			}*/
+			}
 		}
 		if len(tt) > 0 {
 			println("at end, have", len(tt), "blocks remaining...")

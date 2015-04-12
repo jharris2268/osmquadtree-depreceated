@@ -42,15 +42,20 @@ func (ep ElementPair) Ok() bool {
 }
 
 func objCmp(a elements.Element, b elements.Element) int {
+    
 	if a == nil && b == nil {
 		return 0
 	}
+    
+    //an entity is less than a nil
 	if a == nil {
 		return 1
 	}
 	if b == nil {
 		return -1
 	}
+    
+    // if same type, compare Id
 	if a.Type() == b.Type() {
 		if a.Id() == b.Id() {
 			return 0
@@ -115,11 +120,13 @@ func PairObjsChan(lhs <-chan elements.Element, rhs <-chan elements.Element) <-ch
         
         for aok || bok {
             if !aok {
+                // no rhs left
                 res <- ElementPair{nil,b}
                 b,bok = <-rhs
                 continue
             }
             if !bok {
+                // no lhs left
                 res <- ElementPair{a,nil}
                 a,aok = <-lhs
                 continue
@@ -127,15 +134,17 @@ func PairObjsChan(lhs <-chan elements.Element, rhs <-chan elements.Element) <-ch
             
             switch objCmp(a,b) {
                 case 0:
-                    
+                    // same obj, return both
                     res <- ElementPair{a,b}
                     a,aok = <-lhs
                     b,bok = <-rhs
                     
                 case -1:
+                    // same lhs lower than rhs
                     res <- ElementPair{a,nil}
                     a,aok = <-lhs
                 case 1:
+                    // same lhs higher than rhs
                     res <- ElementPair{nil,b}
                     b,bok = <-rhs
             }
@@ -145,7 +154,7 @@ func PairObjsChan(lhs <-chan elements.Element, rhs <-chan elements.Element) <-ch
     return res
 }
 
-func mergeChangeObjs_(lhs elements.Block, rhs elements.Block) elements.ByElementId {
+func mergeTwoChangeObjBlocks(lhs elements.Block, rhs elements.Block) elements.ByElementId {
 	aa := make(elements.ByElementId, 0, lhs.Len()+rhs.Len())
     ss := PairObjs(lhs,rhs)
 	for s := ss(); s.Ok(); s=ss() {
@@ -170,15 +179,18 @@ type blockList []elements.ExtendedBlock
 func (bl blockList) Len() int { return len(bl) }
 func (bl blockList) Block(i int) elements.Block { return bl[i] }
 
-func mergeChangeObjs(blocks blockList) elements.Block {
+func mergeManyChangeObjBlocks(blocks blockList) elements.Block {
+
 	l := blocks.Len()
 	if l == 1 {
 		return blocks.Block(0)
 	} else if l == 2 {
-		return mergeChangeObjs_(blocks.Block(0), blocks.Block(1))
+		return mergeTwoChangeObjBlocks(blocks.Block(0), blocks.Block(1))
 	}
+    // call mergeManyChangeObjBlocks on each half, then call
+    
 	hl := l / 2
-	return mergeChangeObjs_(mergeChangeObjs(blocks[:hl]), mergeChangeObjs(blocks[hl:]))
+	return mergeTwoChangeObjBlocks(mergeManyChangeObjBlocks(blocks[:hl]), mergeManyChangeObjBlocks(blocks[hl:]))
 }
 
 // MergeChangeBlock combines multiple input blocks into a single output
@@ -195,9 +207,9 @@ func MergeChangeBlock(idx int, inBlocks []elements.ExtendedBlock) elements.Exten
 	sort.Sort(byQuadtreeAndStartDate(inBlocks))
 
 	qt := inBlocks[0].Quadtree()
-	sd := inBlocks[0].StartDate()
-	ed := inBlocks[len(inBlocks)-1].EndDate()
-    objects := mergeChangeObjs(inBlocks)
+	sd := inBlocks[0].StartDate() //startdate from first block
+	ed := inBlocks[len(inBlocks)-1].EndDate() //enddate from last
+    objects := mergeManyChangeObjBlocks(inBlocks)
     
 	//println("make",len(inBlocks),idx,qt.String(),sd,ed,objects.Len())
 	return elements.MakeExtendedBlock(idx, objects, qt, sd, ed,nil)
@@ -213,12 +225,7 @@ func MergeChange(inBlocks <-chan []elements.ExtendedBlock) (<-chan elements.Exte
 	go func() {
         i:=0
 		for bl := range inBlocks {
-            /*tb:=0
-            for _,b:=range bl {
-                tb+=b.Len()
-            }*/
             rr := MergeChangeBlock(i,bl)
-            //println(i,len(bl),rr.Len(),rr.Quadtree().String())
 			res <- rr
             i++
         }

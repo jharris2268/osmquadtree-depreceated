@@ -33,34 +33,36 @@ func PackElement(
 	tl := 50 + len(data) + len(info) + len(tags)
 	p := 0
 	res := make([]byte, tl)
-	res[0] = byte(et)
-	res[1] = byte(ct)
-	p = utils.WriteInt64(res, 2, int64(id))
-	p = utils.WriteVarint(res, p, int64(qt))
-	p = utils.WriteData(res, p, data)
-	p = utils.WriteData(res, p, info)
-	p = utils.WriteData(res, p, tags)
-
+	res[0] = byte(et) // element type, 1 byte
+	res[1] = byte(ct) // change type, 1 byte
+	p = utils.WriteInt64(res, 2, int64(id)) //write id as fixed size 
+	p = utils.WriteVarint(res, p, int64(qt)) //qt as varint
+	p = utils.WriteData(res, p, data) //single 0 if not present
+	p = utils.WriteData(res, p, info) //single 0 if not present
+	p = utils.WriteData(res, p, tags) //single 0 if not present
+    
+    //a packed element can be anything from 14 bytes to several mb (really big geometries)
 	return res[:p]
 }
 
+//A PackedElement is a []byte which contains one packed element
 type PackedElement []byte
 
 func (po PackedElement) Type() ElementType {
-	return ElementType(po[0])
+	return ElementType(po[0]) // extract from first byte
 }
 
 func (po PackedElement) ChangeType() ChangeType {
-	return ChangeType(po[1])
+	return ChangeType(po[1]) // extract from second byte
 }
 
 func (po PackedElement) Id() Ref {
 	r, _ := utils.ReadInt64([]byte(po), 2)
-	return Ref(r)
+	return Ref(r) // extract from bytes 2-10
 }
 
 func (po PackedElement) Pack() []byte {
-	return []byte(po)
+	return []byte(po) // do nothing
 }
 
 func (po PackedElement) String() string {
@@ -70,13 +72,13 @@ func (po PackedElement) String() string {
 func packInfo(vs int64, ts Timestamp, cs Ref, ui int64, user string,visible bool) []byte {
 	l := 50 + len(user)
 	res := make([]byte, l)
-	p := utils.WriteVarint(res, 0, vs)
-	p = utils.WriteVarint(res, p, int64(ts))
-	p = utils.WriteVarint(res, p, int64(cs))
-	p = utils.WriteVarint(res, p, ui)
-	p = utils.WriteData(res, p, []byte(user))
+	p := utils.WriteVarint(res, 0, vs)          //version 
+	p = utils.WriteVarint(res, p, int64(ts))    //timestamp (integer)
+	p = utils.WriteVarint(res, p, int64(cs))    //changeset
+	p = utils.WriteVarint(res, p, ui)           //user id
+	p = utils.WriteData(res, p, []byte(user))   //user (utf-8 string)
     if !visible {
-        res[p] = 0
+        res[p] = 0                              //single 0 byte if visible tag is false
         p++
     }
 	return res[:p]
@@ -119,10 +121,10 @@ func packTags(keys, vals []string) []byte {
 	}
 
 	res := make([]byte, tl)
-	p := utils.WriteVarint(res, 0, int64(len(keys)))
+	p := utils.WriteVarint(res, 0, int64(len(keys))) //number of tags
 	for i, k := range keys {
-		p = utils.WriteData(res, p, []byte(k))
-		p = utils.WriteData(res, p, []byte(vals[i]))
+		p = utils.WriteData(res, p, []byte(k))       //key
+		p = utils.WriteData(res, p, []byte(vals[i])) //value, repeated
 	}
 	return res[:p]
 }
@@ -141,6 +143,8 @@ func PackTags(tags Tags) []byte {
 	return res[:p]
 }
 
+//Pack longnitude and latitude as 32bit integers: this is bit enough to
+//store locations in the openstreetmap standard of units 0.0000001 degree
 func PackLonlat(ln int64, lt int64) []byte {
 	res := make([]byte, 8)
 	res[0] = byte((ln >> 24) & 255)
@@ -179,17 +183,17 @@ func unpackLonlat(buf []byte) (int64, int64) {
 
 func PackRefs(nn Refs) []byte {
 	res := make([]byte, 10*(1+nn.Len()))
-	p := utils.WriteVarint(res, 0, int64(nn.Len()))
+	p := utils.WriteVarint(res, 0, int64(nn.Len())) //number of node refs
 	s := Ref(0)
 	for i := 0; i < nn.Len(); i++ {
-		p = utils.WriteVarint(res, p, int64(nn.Ref(i)-s))
+		p = utils.WriteVarint(res, p, int64(nn.Ref(i)-s)) // delta packed
 		s = nn.Ref(i)
 	}
 
 	return res[:p]
 }
 
-func packRefs(nn []Ref) []byte {
+func PackRefSlice(nn []Ref) []byte {
 	res := make([]byte, 10*(1+len(nn)))
 	p := utils.WriteVarint(res, 0, int64(len(nn)))
 	s := int64(0)
@@ -229,12 +233,12 @@ func PackMembers(mm Members) []byte {
 		tl += len(mm.Role(i))
 	}
 	res := make([]byte, tl)
-	p := utils.WriteVarint(res, 0, int64(mm.Len()))
+	p := utils.WriteVarint(res, 0, int64(mm.Len())) //number of members
 	s := Ref(0)
 	for i := 0; i < mm.Len(); i++ {
-		p = utils.WriteVarint(res, p, int64(mm.MemberType(i)))
+		p = utils.WriteVarint(res, p, int64(mm.MemberType(i))) 
 		//println("p",r.ref,r.ref-s)
-		p = utils.WriteVarint(res, p, int64(mm.Ref(i)-s))
+		p = utils.WriteVarint(res, p, int64(mm.Ref(i)-s)) //delta packed
 		s = mm.Ref(i)
 		p = utils.WriteData(res, p, []byte(mm.Role(i)))
 
@@ -286,7 +290,9 @@ func unpackMembers(buf []byte) []relMember {
 	}
 	return ans
 }
-
+//UnpackElement deserializes the input data into a FullElement, which
+//can be converted to FullNode,FullWay,FullRelation or PackedGeometry
+//depending on the value of FullElement.Type()
 func UnpackElement(buf []byte) FullElement {
 	et := ElementType(buf[0])
 	ct := ChangeType(buf[1])
@@ -348,6 +354,8 @@ type refSlice []Ref
 func (rf refSlice) Len() int      { return len(rf) }
 func (rf refSlice) Ref(i int) Ref { return rf[i] }
 
+//UnpackQtRefs is used by update.CalcUpdateTiles as a faster alternative
+//to UnpackElement, missing out the Info and Tags strings
 func UnpackQtRefs(buf []byte) (ElementType, ChangeType, Ref, quadtree.Quadtree, Refs) {
 	et := ElementType(buf[0])
 	ct := ChangeType(buf[1])

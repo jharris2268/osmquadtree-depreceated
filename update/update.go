@@ -331,7 +331,7 @@ func newChangeEle(e elements.Element, ct elements.ChangeType, q quadtree.Quadtre
 }
 
 
-func CalcUpdateTiles(prfx string, xmlfn string, enddate elements.Timestamp, newfn string, state int64, lctype string) (<-chan elements.ExtendedBlock, quadtree.QuadtreeSlice, error) {
+func CalcUpdateTiles(prfx string, xmlfn string, enddate elements.Timestamp, newfn string, state int64, lctype string) ([]chan elements.ExtendedBlock, quadtree.QuadtreeSlice, error) {
 	changeobjs, nodelocs, objQts, wayNodes, maxts, err := fetchChangeObjs(xmlfn)
 	
     fmt.Printf("prfx=%s; %d tiles, %d nodelocs, %d objQts, %d waynodes\n",
@@ -691,14 +691,20 @@ func CalcUpdateTiles(prfx string, xmlfn string, enddate elements.Timestamp, newf
         
 	}
     
-	res := make(chan elements.ExtendedBlock)
+	res := make([]chan elements.ExtendedBlock,4)
+    for i,_:=range res {
+        res[i] = make(chan elements.ExtendedBlock)
+    }
 	go func() {
 		for i, k := range ks {
             vv := allocs[k]
             vv.Sort()
-			res <- elements.MakeExtendedBlock(i, vv, k, startdate, enddate,nil )
+			res[i%4] <- elements.MakeExtendedBlock(i, vv, k, startdate, enddate,nil )
 		}
-		close(res)
+        for _,r:=range res {
+            close(r)
+        }
 	}()
+    
 	return res, ks, nil
 }

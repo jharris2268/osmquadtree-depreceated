@@ -142,9 +142,17 @@ func Elements(block Block) ByElementId {
 // AsNormalBlock calls AsNormal on each element of block
 func AsNormalBlock(block Block) Block {
 
-	oo := make(ByElementId, block.Len())
+	oo := make(ByElementId, 0, block.Len())
 	for i, _ := range oo {
-		oo[i] = AsNormal(block.Element(i))
+        e:=block.Element(i)
+        switch e.ChangeType() {
+            case Normal:
+                oo = append(oo, e)
+            case Delete,Remove:
+                //pass
+            case Unchanged, Modify, Create:
+                oo = append(oo, AsNormal(e))
+        }
 	}
 	return oo
 }

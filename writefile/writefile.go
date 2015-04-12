@@ -257,7 +257,22 @@ func WritePbfFileM(inc []chan elements.ExtendedBlock, outfn string, isc bool) (w
 }
  
  
- 
+
+func checkprogress(cc chan IdxItem, ll int) {
+    st:=time.Now()
+    var p IdxItem
+    tl:=int64(0)
+    for p=range cc {
+        tl+=p.Len
+        if (p.Idx%1371)==0 {
+            fmt.Printf("\r%8.1fs %6d %-18s %8d bytes [%12d total]", time.Since(st).Seconds(), p.Idx, p.Quadtree, p.Len,tl)
+        }
+    }
+    if (p.Idx%1371)!=0 {
+        fmt.Printf("\r%8.1fs %6d %-18s %8d bytes [%12d total]", time.Since(st).Seconds(), p.Idx, p.Quadtree, p.Len,tl)
+    }
+    fmt.Printf("\n")
+}
  
 func WriteQts(inc <-chan elements.ExtendedBlock, outfn string) error {
     outf,err:=os.Create(outfn)
@@ -314,7 +329,12 @@ func WriteBlocksOrdered(
     rem := 4
     j:=0
     
-    var mm string
+    
+    var progc chan IdxItem
+    if prog {
+        progc =make(chan IdxItem)
+        go checkprogress(progc,1371)
+    }
     
     for rem>0 {
         
@@ -334,15 +354,12 @@ func WriteBlocksOrdered(
                 li := IdxItem{p.Idx(),d.Quadtree(),int64(len(d.Data())),false}
                 items=append(items, li)
                 if prog {
-                    mm = fmt.Sprintf("\r%8.1fs %6d %-18s %8d bytes", time.Since(st).Seconds(), li.Idx, li.Quadtree, li.Len)
-                    if (p.Idx()%3871)==0 {
-                        fmt.Printf(mm)
-                    }
+                    progc <- li
                 }
                 
             } else {
                 fmt.Printf("\n%8.1fs: NULL p.Idx()\n", time.Since(st).Seconds(), p.Idx())
-                mm=""
+                
                 items=append(items, IdxItem{p.Idx(),d.Quadtree(),int64(0),false})
             }
         }
@@ -350,7 +367,7 @@ func WriteBlocksOrdered(
         j++
     }
     if prog {
-        fmt.Println(mm)
+        close(progc)
     }
     
     //close(mm)

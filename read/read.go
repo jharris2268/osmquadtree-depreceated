@@ -58,7 +58,8 @@ func makeTags(kk []uint64, vv []uint64, st []string) (elements.Tags,error) {
 
 
 func readPlain(buf []byte, readObjsImpl readObjs, change bool) (quadtree.Quadtree, elements.ByElementId,error) {
-    objs := make(elements.ByElementId, 0, 10000)
+    //objs := make(elements.ByElementId, 0, 10000)
+    var objs elements.ByElementId
     var err error
     var qt quadtree.Quadtree
     pos, msg := utils.ReadPbfTag(buf, 0)
@@ -180,26 +181,42 @@ func readPrimitiveGroup(buf []byte, st []string, objs elements.ByElementId, read
         switch msg.Tag {
             case 1:
                 if readOb.addType(elements.Node) {
+                    
                     o,err = readOb.node(msg.Data, st, ct)
+                    if objs == nil {
+                        objs = make(elements.ByElementId,0,10000)
+                    }
                     objs=append(objs, o)
                 }
             case 2:
                 if readOb.addType(elements.Node) {
+                    if objs == nil {
+                        objs = make(elements.ByElementId,0,10000)
+                    }
                     objs, err = readOb.dense(msg.Data, st, objs, ct)
                 }
             case 3:
                 if readOb.addType(elements.Way) {
                     o,err = readOb.way(msg.Data, st, ct)
+                    if objs == nil {
+                        objs = make(elements.ByElementId,0,10000)
+                    }
                     objs=append(objs, o)
                 }
             case 4:
                 if readOb.addType(elements.Relation) {
                     o,err = readOb.relation(msg.Data, st, ct)
+                    if objs == nil {
+                        objs = make(elements.ByElementId,0,10000)
+                    }
                     objs=append(objs, o)
                 }
             case 20:
                 if readOb.addType(elements.Geometry) {
                     o,err = readOb.geometry(msg.Data, st, ct)
+                    if objs == nil {
+                        objs = make(elements.ByElementId,0,10000)
+                    }
                     objs=append(objs, o)
                 }
             

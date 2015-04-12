@@ -37,7 +37,7 @@ type objQt interface {
 	ObjsIter(elements.ElementType, int) <-chan elements.ByElementId
 }
 
-const tileLen = 1 << 14
+const tileLen = 1 << 18
 var tileSz = elements.Ref(tileLen)
 
 type qtTile struct {

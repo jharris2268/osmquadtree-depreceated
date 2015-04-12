@@ -118,10 +118,13 @@ func OnTerm() {
     go func() {
         z:=<-c
         fmt.Println("TERM", z)
+        
         buf := make([]byte, 1<<16)
         sl:=runtime.Stack(buf, true)
         fmt.Println(string(buf[:sl]))
-
+        
+        WriteMemoryProfile()
+        
         os.Exit(1)
     }()
 }

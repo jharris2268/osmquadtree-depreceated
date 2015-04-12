@@ -14,7 +14,7 @@ import (
 
 func exStr(qt quadtree.Quadtree, ct ChangeType) string {
 	s := ""
-	if qt != 0 {
+	if qt != quadtree.Null {
 		s += fmt.Sprintf(" %-18s", qt)
 	}
 	if ct != Normal {
@@ -125,7 +125,7 @@ func MakeWay(id Ref, info Info, tags Tags,
 }
 
 func (fn *fullWay) Pack() []byte {
-	return PackFullElement(fn, packRefs(fn.refs))
+	return PackFullElement(fn, PackRefSlice(fn.refs))
 	//return PackElement(Way,fn.ct,fn.id,fn.qt,packRefs(fn.refs), fn.info.Pack(), fn.tags.Pack())
 }
 

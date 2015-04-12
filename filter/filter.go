@@ -62,12 +62,22 @@ type IdSet interface {
 	Len() int
 }
 
+//A LocTest is a spatial filter, such as a simple Bbox or a Polygon
 type LocTest interface {
+    //smallest rectangle covering given area
 	Bbox() quadtree.Bbox
-	Contains(int64, int64) bool
+    
+    //return True if node loc in area
+	Contains(int64, int64) bool 
+    
+    //return True if quadtree bounds entirely within given area
 	ContainsQuadtree(quadtree.Quadtree) bool
+    
+    //return True if bbox intersects given area
 	Intersects(bx quadtree.Bbox) bool
-	IntersectsQuadtree(quadtree.Quadtree) bool
+	
+    //return True if quadtree bounds intersect given area
+    IntersectsQuadtree(quadtree.Quadtree) bool
 	String() string
 }
 
@@ -164,9 +174,15 @@ func MakeIdSet(bm bool) IdSet {
     return &idSetMap{}
 }
 
+//FindObjsFilter populates the given IdSet ids with the ids for elements
+//in inblocks which pass the LocTest locTest. These elements are:
+//1. Nodes within the the locTest
+//2. Ways with at least one node within the locTest
+//3. Other nodes belonging to Ways which are included (equilivant to osmosis' --complete-ways)
+//4. Relations with at least on member within the locTest
 func FindObjsFilter(inblocks <-chan elements.ExtendedBlock, locTest LocTest, ids IdSet) error {
 
-	wns := &idSetMap{}
+	wns := &idSetMap{} //track other nodes: point 3 above
 
 	rls := map[elements.Ref]elements.Members{}
 
@@ -189,7 +205,7 @@ func FindObjsFilter(inblocks <-chan elements.ExtendedBlock, locTest LocTest, ids
                     wn := o.(elements.Refs)
                     if qq || nodePresent(wn, ids) {
                         ids.Add(1, o.Id())
-                        addOthers(wn, ids, wns)
+                        addOthers(wn, ids, wns) //nodes not already included
                     }
                 case elements.Relation:
                     mm := o.(elements.Members)
@@ -197,7 +213,7 @@ func FindObjsFilter(inblocks <-chan elements.ExtendedBlock, locTest LocTest, ids
                         ids.Add(2, o.Id())
                     } else {
                         
-                        rls[o.Id()] = mm
+                        rls[o.Id()] = mm //double check relations later
                     }
 			}
 		}
@@ -210,14 +226,14 @@ func FindObjsFilter(inblocks <-chan elements.ExtendedBlock, locTest LocTest, ids
 			if memberPresent(mm, ids) {
 				ids.Add(2, oi)
 			} else {
-				rl2[oi] = mm
+				rl2[oi] = mm //check again next time round
 			}
 		}
 		rls = rl2
 	}
 
 	for k, _ := range *wns {
-		ids.Add(0, elements.Ref(k))
+		ids.Add(0, elements.Ref(k)) //add other nodes
 	}
 
 	return nil
@@ -231,17 +247,17 @@ func filterRelMembers(o elements.Element, ids IdSet) elements.Element {
 	}
 	rr, tt, rl := make([]elements.Ref, 0, mm.Len()), make([]elements.ElementType, 0, mm.Len()), make([]string, 0, mm.Len())
 	for i := 0; i < mm.Len(); i++ {
-		if ids.Contains(mm.MemberType(i), mm.Ref(i)) {
-			rr = append(rr, mm.Ref(i))
+		if ids.Contains(mm.MemberType(i), mm.Ref(i)) { //only add if id within ids
+			rr = append(rr, mm.Ref(i)) 
 			tt = append(tt, mm.MemberType(i))
 			rl = append(rl, mm.Role(i))
 		}
 	}
 	if len(rr) == mm.Len() {
-		return o
+		return o //no change, so return input relation
 	}
 	if len(rr) == 0 && o.ChangeType() == 0 {
-		return nil
+		return nil //no members, so pass nil (unless if in change block)
 	}
 	return elements.MakeRelation(
 		rel.Id(),
@@ -264,10 +280,14 @@ func filterBlock(bl elements.ExtendedBlock, ids IdSet) elements.ExtendedBlock {
             }
         }
     }
+    //return even if we have no elements
     return elements.MakeExtendedBlock(
         bl.Idx(), ee, bl.Quadtree(), bl.StartDate(), bl.EndDate(), bl.Tags())
 }
     
+//FilterObjs passes only the elements with ids in IdSet. See FindObjsFilter.
+//Relations members are trimmed to only include objects to be passed on
+//(equivilant to osmosis' --clip-incomplete-relations)
 func FilterObjs(inblock []chan elements.ExtendedBlock, ids IdSet) ([]chan elements.ExtendedBlock,error) {
     out := make([]chan elements.ExtendedBlock,len(inblock))
     
