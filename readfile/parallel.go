@@ -14,6 +14,7 @@ import (
 
 
 func lowestQt(vals []elements.ExtendedBlock) quadtree.Quadtree {
+    //find lowest block quadtree from vals
     lq := quadtree.Null
     for _,v := range vals {
         if v==nil {
@@ -29,15 +30,19 @@ func lowestQt(vals []elements.ExtendedBlock) quadtree.Quadtree {
     return lq
 }
 
+
 func getQt( vals    []elements.ExtendedBlock,
             incs    []<-chan elements.ExtendedBlock,
             qt      quadtree.Quadtree ) []elements.ExtendedBlock {
+    //retrive blocks from vals with given quadtree qt (which should be
+    //the lowest value), and fetch next block from incs when we do
     
     ans:=make([]elements.ExtendedBlock, 0, len(vals))
     for i,v := range vals {
         if v!=nil {
             var ok bool
             if v.Quadtree() == qt {
+                //add to ans, fetch next block
                 ans=append(ans, v)
                 vals[i],ok = <-incs[i]
                 if !ok {
@@ -53,6 +58,7 @@ func getQt( vals    []elements.ExtendedBlock,
 
 func getNext(incs []<-chan elements.ExtendedBlock) func() []elements.ExtendedBlock {
     vals := make([]elements.ExtendedBlock, len(incs))
+    //set up current blocks vals
     for i,inc := range incs {
         v,ok := <- inc
         for ok && v.Quadtree()<0 {
@@ -62,9 +68,9 @@ func getNext(incs []<-chan elements.ExtendedBlock) func() []elements.ExtendedBlo
     }
     
     return func() []elements.ExtendedBlock {
-        //println("getNext...")
+        //this function should be called repeatedly until the result is nil
         lowest := lowestQt(vals)
-        //println("lowest=",lowest.String())
+        
         if lowest == quadtree.Null { return nil }
         return getQt(vals, incs, lowest)
         
@@ -73,26 +79,22 @@ func getNext(incs []<-chan elements.ExtendedBlock) func() []elements.ExtendedBlo
 }
     
 
-
+//ReadPbfFileFullParallel reads the given files fns in parallel, using
+//given function iterFunc, to produce a channel of []elements.ExtendedBlock
+//which groups the file by quadtree. This can be used to group quadtree
+//sorted pbf changes files in order to merge them together.
 func ReadPbfFileFullParallel(fns []string, iterFunc func(string) <-chan elements.ExtendedBlock) (<-chan []elements.ExtendedBlock,error) {
     
-    
+    //set up input blocks
     bls := make([]<-chan elements.ExtendedBlock, len(fns))
     for i,f := range fns {
-        //var err error
         bls[i] = iterFunc(f)
-        //println(f)
-        /*if err!=nil {
-            return nil, err
-        }*/
-        
     }
     
     res := make(chan []elements.ExtendedBlock)
     go func() {
         nn := getNext(bls)
         for nbs := nn(); nbs!=nil; nbs=nn() {
-            //println(len(nbs),nbs[0].Quadtree().String())
             res <- nbs
         }
         close(res)
@@ -101,7 +103,8 @@ func ReadPbfFileFullParallel(fns []string, iterFunc func(string) <-chan elements
     return res,nil
 }
 
-
+//ReadExtendedBlockMultiMerge merges together the change files chgfns,
+//and a full pbf file origfn, into a single parallel chan.
 func ReadExtendedBlockMultiMerge(origfn string, chgfns []string, nc int) ([]chan elements.ExtendedBlock, error) {
     
     
@@ -124,6 +127,10 @@ func ReadExtendedBlockMultiMerge(origfn string, chgfns []string, nc int) ([]chan
         
 }
 
+
+//ReadExtendedBlockMultiMergeQtsSingleFile merges together blocks from
+//a single file origfn, filtering by quadtree using passQt. Such input
+//files can be created by osmquadtree-filter.
 func ReadExtendedBlockMultiMergeQtsSingleFile(origfn string, nc int, passQt func(quadtree.Quadtree) bool) ([]chan elements.ExtendedBlock, error) {
     
     
@@ -173,7 +180,9 @@ func ReadExtendedBlockMultiMergeQtsSingleFile(origfn string, nc int, passQt func
             
     
 
-
+//ReadExtendedBlockMultiMergeQts merges together the change files chgfns,
+//and a full pbf file origfn, into a single parallel chan. The input
+//files are filtered by passQt. This can act as a coarse spatial filter.
 func ReadExtendedBlockMultiMergeQts(origfn string, chgfns []string, nc int, passQt func(quadtree.Quadtree) bool) ([]chan elements.ExtendedBlock, error) {
     
     if len(chgfns)==0 {
@@ -205,7 +214,8 @@ func ReadExtendedBlockMultiMergeQts(origfn string, chgfns []string, nc int, pass
 
 
 
-
+//MakePassQt produces a function a quadtree filter function which returns
+//true for the quadtrees present in qts.
 func MakePassQt(qts map[quadtree.Quadtree]bool) func(quadtree.Quadtree) bool {
     return func(q quadtree.Quadtree) bool {
         _,ok:=qts[q]
@@ -214,12 +224,6 @@ func MakePassQt(qts map[quadtree.Quadtree]bool) func(quadtree.Quadtree) bool {
 }
 
 
-func ReadMergeChangePbfSorted(origfn string, chgfns []string, nc int, passQt func(quadtree.Quadtree) bool) (<-chan elements.ExtendedBlock,error) {
-    
-    dd,err := ReadExtendedBlockMultiMergeQts(origfn,chgfns,nc,passQt)
-    if err!=nil { return nil,err }
-    return CollectExtendedBlockChans(dd,false),nil
-}
 
 func ReadExtendedBlockMultiQtsUnmerged(origfn string, chgfns []string, nc int, passQt func(quadtree.Quadtree) bool, nout int) ([]chan elements.ExtendedBlock,error) {
     

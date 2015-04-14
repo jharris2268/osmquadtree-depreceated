@@ -65,6 +65,7 @@ func (bbox Bbox) Contains(other Bbox) bool {
     return true
 }
 
+//Return true if bbox contains point
 func (bbox Bbox) ContainsXY(x,y int64) bool {
     if (bbox.Minx > x) { return false }
     if (bbox.Miny > y) { return false }
@@ -73,11 +74,12 @@ func (bbox Bbox) ContainsXY(x,y int64) bool {
     return true
 }
 
-
+//Expand to include other
 func (bbox *Bbox) ExpandBox(other Bbox) *Bbox {
     return bbox.Expand(other.Minx,other.Miny,other.Maxx,other.Maxy)
 }
 
+//Expand to include other bbox
 func (bbox *Bbox) Expand(mx,my,Mx,My int64) *Bbox {
     if mx < bbox.Minx { bbox.Minx = mx }
     if my < bbox.Miny { bbox.Miny = my }
@@ -88,11 +90,13 @@ func (bbox *Bbox) Expand(mx,my,Mx,My int64) *Bbox {
 
 }
 
+//Expand to include point (given by points)
 func (bbox *Bbox) ExpandXY(x,y int64) *Bbox {
     return bbox.Expand(x,y,x,y)
 }
 
-
+//Expand to include pt, which satisfies
+//interface{ Lon() int64, Lat() int64} (such as a elements.FullNode)
 func (bbox *Bbox) ExpandPt(pt interface{} ) *Bbox {
     lnlt,ok := pt.(interface{
         Lon() int64

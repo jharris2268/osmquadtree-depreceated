@@ -19,10 +19,13 @@ import (
     //"fmt"
 )
 
+
+
+// call readfn on each pbffile.FileBlock, writing result to outblocks
+// usually called on parallel channels
 func readBlocks(
     inblocks <-chan pbffile.FileBlock,
     readfn func(int, []byte, bool) (elements.ExtendedBlock,error),
-    pc     int,
     ischange bool,
     outblocks chan <- elements.ExtendedBlock) error {
     
@@ -48,14 +51,17 @@ func readBlocks(
     return nil
 }
 
-
+// MakeFileBlockChanSingle produces a chan of each fileblock in fn, in order.
+// Returns (chan fileblocks, ischange, error)
 func MakeFileBlockChanSingle(fn string) (<-chan pbffile.FileBlock, bool, error) {
     fl,err := os.Open(fn)
     if err!=nil { return nil,false,err}
     isc:=strings.HasSuffix(fn,"pbfc")
     return pbffile.ReadPbfFileBlocksDefer(fl), isc, nil
 }
-
+// MakeFileBlockChanSplit produces nc parallel chans of each fileblock.
+// channel i contsists of block i, i+nc, i+2*nc etc.
+// Returns (chan fileblocks, ischange, error)
 func MakeFileBlockChanSplit(fn string, nc int) ([]<-chan pbffile.FileBlock, bool, error) {
     fl,err := os.Open(fn)
     if err!=nil { return nil,false,err}
@@ -66,13 +72,13 @@ func MakeFileBlockChanSplit(fn string, nc int) ([]<-chan pbffile.FileBlock, bool
 type ReadDataFunc func(int,[]byte,bool) (elements.ExtendedBlock, error)
 
 
-
+//
 func ReadDataSingle(blocks <-chan pbffile.FileBlock, isc bool, readData ReadDataFunc) (<-chan elements.ExtendedBlock,error) {
     
     res := make(chan elements.ExtendedBlock)
     
     go func() {
-        readBlocks(blocks, readData,0,isc,res)
+        readBlocks(blocks, readData,isc,res)
         close(res)
     }()
     return res, nil
@@ -87,7 +93,7 @@ func ReadDataMulti(blocks []<-chan pbffile.FileBlock, isc bool, readData ReadDat
         res[i] = make(chan elements.ExtendedBlock)
         go func(i int) {
             //fmt.Println("call",i,"th readBlocks",blocks[i],readData,nc,isc,res[i])
-            readBlocks(blocks[i], readData, nc, isc, res[i])
+            readBlocks(blocks[i], readData, isc, res[i])
             //fmt.Println("finished",i)
             close(res[i])
         }(i)
@@ -103,35 +109,25 @@ func ReadDataMultiSorted(blocks []<-chan pbffile.FileBlock, isc bool, readData R
         return nil,err
     }
     
-    return CollectExtendedBlockChans(dd, false),nil
+    return CollectExtendedBlockChans(dd),nil
 }
 
 
-
-func CollectExtendedBlockChans(resp []chan elements.ExtendedBlock,msgs bool) <-chan elements.ExtendedBlock {
+// CollectExtendedBlockChans combines resp parallel channels to single
+// output channel: opposite to SplitExtendedBlockChans
+func CollectExtendedBlockChans(resp []chan elements.ExtendedBlock) <-chan elements.ExtendedBlock {
     res := make(chan elements.ExtendedBlock)
     go func() {
         nc:=len(resp)
         rem:=nc
         i:=0
-        fins:=make([]bool,nc)
-        for i,_:=range fins {
-            fins[i]=true
-        }
         
         for rem>0 {
-            if fins[i%nc] {
-                var b elements.ExtendedBlock
-                b,fins[i%nc] = <- resp[i%nc]
-                if fins[i%nc] {
-                    if msgs {
-                        println("collect: ",i,i%nc,b.Idx(),b.String())
-                    }
-                    res <- b
-                } else {
-                    //println("finished",i,i%nc)
-                    rem--
-                }
+            b,ok := <- resp[i%nc]
+            if ok{
+                res <- b
+            } else {
+                rem--
             }
             i++
         }
@@ -140,6 +136,25 @@ func CollectExtendedBlockChans(resp []chan elements.ExtendedBlock,msgs bool) <-c
     return res
 }
 
+// SplitExtendedBlockChans splits single input channel to nc parallel
+// channels: opposite to CollectExtendedBlockChans
+func SplitExtendedBlockChans(inc <-chan elements.ExtendedBlock, nc int) []chan elements.ExtendedBlock {
+    res:=make([]chan elements.ExtendedBlock, nc)
+    for i,_:=range res {
+        res[i] = make(chan elements.ExtendedBlock)
+    }
+    go func() {
+        z:=0
+        for bl:=range inc {
+            res[z%nc] <- bl
+            z++
+        }
+        for _,r:=range(res) {
+            close(r)
+        }
+    }()
+    return res
+}
 
 func ReadSomeElements(nodes bool, ways bool, relations bool) ReadDataFunc {
     return func(idx int, bl []byte, isc bool) (elements.ExtendedBlock,error) {

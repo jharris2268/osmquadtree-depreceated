@@ -17,6 +17,7 @@ import (
 
 
 
+//read element id, quadtree and data: location, nodes or members as appropiate
 
 type nodeloc struct {
     ref, qt int64
@@ -89,6 +90,7 @@ func (readObjsData) node(buf []byte, st []string, ct elements.ChangeType) (eleme
     pos,msg:=utils.ReadPbfTag(buf,0)
     for ; msg.Tag>0; pos,msg=utils.ReadPbfTag(buf,pos) {
         switch msg.Tag{
+            //ignore info and tags
             case 1: a=int64(msg.Value)
             case 8: d=utils.UnZigzag(msg.Value)
             case 9: c=utils.UnZigzag(msg.Value)
@@ -106,6 +108,7 @@ func (readObjsData) way(buf []byte, st []string, ct elements.ChangeType) (elemen
     pos,msg:=utils.ReadPbfTag(buf,0)
     for ; msg.Tag>0; pos,msg=utils.ReadPbfTag(buf,pos) {
         switch msg.Tag{
+            //ignore info and tags
             case 1: a=int64(msg.Value)
             case 8: c,_=utils.ReadDeltaPackedList(msg.Data)
             case 20: b = utils.UnZigzag(msg.Value)
@@ -124,6 +127,7 @@ func (readObjsData) relation(buf []byte, st []string, ct elements.ChangeType) (e
     pos,msg:=utils.ReadPbfTag(buf,0)
     for ; msg.Tag>0; pos,msg=utils.ReadPbfTag(buf,pos) {
         switch msg.Tag{
+            //ignore info and tags
             case 1: a=int64(msg.Value)
             case 10: c,_=utils.ReadPackedList(msg.Data)
             case 9: d,_=utils.ReadDeltaPackedList(msg.Data)
@@ -144,6 +148,7 @@ func (readObjsData) dense(buf []byte, st []string, objs elements.ByElementId, ct
     pos,msg:=utils.ReadPbfTag(buf,0)
     for ; msg.Tag>0; pos,msg=utils.ReadPbfTag(buf,pos) {
         switch msg.Tag{
+            //ignore info and tags
             case 1:
                 ii,err = utils.ReadDeltaPackedList(msg.Data)
             case 8:

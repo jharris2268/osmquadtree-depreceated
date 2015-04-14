@@ -12,11 +12,11 @@ import (
 
 type QuadtreeInfo struct {
     Qt Quadtree
-    X,Y,Z int64
-    Minx,Miny,Maxx,Maxy float64
+    X,Y,Z int64 // tile representation
+    Minx,Miny,Maxx,Maxy float64 //bounding box
     Str string
-    Children []*QuadtreeInfo
-    Parent string
+    Children []*QuadtreeInfo //any child nodes
+    Parent string //parent node
 }
 
 
@@ -42,6 +42,9 @@ func (qi *QuadtreeInfo) Add(qt Quadtree) {
     
 }
 
+// MakeQuadtreeInfo produces a QuadtreeInfo tree structure. This is used
+// by the osmquadtree-filter example to show the quadtree structure on a
+// map.
 func MakeQuadtreeInfo(qts QuadtreeSlice) *QuadtreeInfo {
     root := makeQuadtreeInfo(qts[0],"NONE")
     

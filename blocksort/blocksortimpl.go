@@ -363,8 +363,8 @@ func newBlockStoreWriterIdx(split bool, lm int) blockStoreWriter {
     // but single process to write to file
 	go func() {
 		for kdp := range interim {
-			fp, _ := bsi.fl.Seek(0, 2) // file location
-			pbffile.WriteFileBlock(bsi.fl, kdp.data)
+			//fp, _ := bsi.fl.Seek(0, 2) 
+			fp, _ := pbffile.WriteFileBlockAtEnd(bsi.fl, kdp.data) // file location
 			bsi.idx[kdp.key] = append(bsi.idx[kdp.key], fp) // add to slice for given key
 		}
 

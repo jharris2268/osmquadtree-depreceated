@@ -274,9 +274,13 @@ func prepHeaderBlocks(blckType []byte, blckData []byte, comp bool) ([]byte, []by
 	return bl, bh, nil
 }
 
-func WritePbfFileBlock(file io.WriteSeeker, blckType []byte, blckData []byte, comp bool) (int, error) {
+//WritePbfFileBlock serializes the blockData as a pbf fileblock, with
+//given blockType, optionally compressed, and writes it at the end of
+//the given file. It returns the length of the written block.
+//See http://wiki.openstreetmap.org/wiki/PBF_Format#Design
+func WritePbfFileBlock(file io.WriteSeeker, blockType []byte, blockData []byte, compress bool) (int, error) {
 
-	bl, bh, err := prepHeaderBlocks(blckType, blckData, comp)
+	bl, bh, err := prepHeaderBlocks(blockType, blockData, compress)
 	if err != nil {
 		return 0, err
 	}
@@ -291,11 +295,14 @@ func WritePbfFileBlock(file io.WriteSeeker, blckType []byte, blckData []byte, co
 		return 0, err
 	}
 
-	WriteFileBlockAtEnd(file, bh)
-	WriteFileBlockAtEnd(file, bl)
+	WriteFileBlock(file, bh)
+	WriteFileBlock(file, bl)
 	return ln, nil
 }
 
+//WritePbfFileBlock serializes the blockData as a pbf fileblock, with
+//given blockType, optionally compressed, returning the data as a []byte.
+//See http://wiki.openstreetmap.org/wiki/PBF_Format#Design
 func PreparePbfFileBlock(blckType []byte, blckData []byte, comp bool) ([]byte, error) {
 
 	bl, bh, err := prepHeaderBlocks(blckType, blckData, comp)
@@ -316,17 +323,19 @@ func PreparePbfFileBlock(blckType []byte, blckData []byte, comp bool) ([]byte, e
 	return res, nil
 }
 
-func WriteFileBlock(file io.WriteSeeker, res []byte) (int64, error) {
+//WriteFileBlockAtEnd writes the given data to at the end of file, returning
+//the location where it is written.
+func WriteFileBlockAtEnd(file io.WriteSeeker, data []byte) (int64, error) {
 	p, _ := file.Seek(0, 2)
-	return p, WriteFileBlockAtEnd(file, res)
+	return p, WriteFileBlock(file, data)
 }
 
-
-func WriteFileBlockAtEnd(file io.Writer, res []byte) error {
+//WriteFileBlock writes data at the current postion of file
+func WriteFileBlock(file io.Writer, data []byte) error {
 
 	l := 0
-	for l < len(res) {
-		p, err := file.Write(res[l:])
+	for l < len(data) {
+		p, err := file.Write(data[l:])
 		if err != nil {
 			return err
 		}
@@ -430,7 +439,7 @@ func WriteFileBlocks(file io.WriteSeeker, inBlocks <-chan FileBlockWrite) (Block
 	blockLens := make(blockLenSlice, 0, nb)
 	for bl := range prepBlocksSorted {
 		bld := bl.(FileBlockWrite).BlockData()
-		_, err := WriteFileBlock(file, bld)
+		_, err := WriteFileBlockAtEnd(file, bld)
 		if err != nil {
 			return nil, err
 		}

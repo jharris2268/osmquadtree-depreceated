@@ -58,7 +58,8 @@ func makeTags(kk []uint64, vv []uint64, st []string) (elements.Tags,error) {
 
 
 func readPlain(buf []byte, readObjsImpl readObjs, change bool) (quadtree.Quadtree, elements.ByElementId,error) {
-    //objs := make(elements.ByElementId, 0, 10000)
+    //readPlain ignores the stringtable and some of the extra block attributes
+    
     var objs elements.ByElementId
     var err error
     var qt quadtree.Quadtree
@@ -67,8 +68,10 @@ func readPlain(buf []byte, readObjsImpl readObjs, change bool) (quadtree.Quadtre
         switch msg.Tag {
             case 2:
                 if change {
+                    // no stringtable:             nil strintable->
                     objs, err = readPrimitiveGroupChange(msg.Data,nil, objs, readObjsImpl)
                 } else {
+                    // no stringtable:        nil strintable->
                     objs, err = readPrimitiveGroup(msg.Data,nil, objs, readObjsImpl, elements.Normal)
                 }
             case 31:
@@ -92,31 +95,33 @@ func readFull(idx int, buf []byte, readObjsImpl readObjs, change bool) (elements
     
     kk,vv := []uint64{}, []uint64{}
     
+    
+    
     pos,msg := utils.ReadPbfTag(buf, 0)
     var err error
     for ; msg.Tag>0; pos,msg = utils.ReadPbfTag(buf, pos) {
         switch msg.Tag {
             case 1: stringtable,err  = readStringtable(msg.Data)
-            case 2: pgs=append(pgs, msg.Data)
+            case 2: pgs=append(pgs, msg.Data) // primitive groups (i.e. element data): store for now
             case 31:
                 qt, err = readQuadtree(msg.Data)
             
-            case 33:
+            case 33: //startdate
                 if msg.Data == nil {
                     sd = elements.Timestamp(msg.Value)
                 } else {
                     err = errors.New("expected varint for startdate")
                 }
-            case 34:
+            case 34: //enddate
                 if msg.Data == nil {
                     ed = elements.Timestamp(msg.Value)
                 } else {
                     err = errors.New("expected varint for enddate")
                 }
 
-            case 35:
+            case 35: //block tag keys: useful for some geometry table results
                 kk, err = utils.ReadPackedList(msg.Data)
-            case 36:
+            case 36: //block tag values: useful for some geometry table results
                 vv, err = utils.ReadPackedList(msg.Data)
         }
         
@@ -131,7 +136,10 @@ func readFull(idx int, buf []byte, readObjsImpl readObjs, change bool) (elements
     }
     
     objs := make(elements.ByElementId, 0, 10000)
-    for _, dd := range pgs {
+    for _, dd := range pgs { // a primitive block can contain any 
+                             // number of primitive groups. In particular,
+                             // changefiles need a new group for every
+                             // change in changetype            
         if change {
             objs,err = readPrimitiveGroupChange(dd, stringtable, objs, readObjsImpl)
         } else {
@@ -147,6 +155,7 @@ func readFull(idx int, buf []byte, readObjsImpl readObjs, change bool) (elements
 
 
 type readObjs interface {
+    //        data   stringtable   changetype
     node(    []byte, []string, elements.ChangeType) (elements.Element, error)
     way(     []byte, []string, elements.ChangeType) (elements.Element, error)
     relation([]byte, []string, elements.ChangeType) (elements.Element, error)
@@ -154,7 +163,7 @@ type readObjs interface {
     
     dense([]byte, []string, elements.ByElementId, elements.ChangeType) (elements.ByElementId, error)
     
-    addType(elements.ElementType) bool
+    addType(elements.ElementType) bool //return true to read an object of given type
 }
 
 func readPrimitiveGroupChange(buf []byte, st []string, objs elements.ByElementId, readOb readObjs)  (elements.ByElementId, error) {
@@ -162,12 +171,13 @@ func readPrimitiveGroupChange(buf []byte, st []string, objs elements.ByElementId
     
     pos, msg := utils.ReadPbfTag(buf,0)
     for ; msg.Tag>0; pos,msg = utils.ReadPbfTag(buf, pos) {
+        //only extract changetype value
         if msg.Tag == 10 {
             ct = elements.ChangeType(msg.Value)
             break
         }
     }
-    
+    // call readPrimitiveGroup with found value
     return readPrimitiveGroup(buf,st,objs,readOb,ct)
 }
 

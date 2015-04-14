@@ -280,7 +280,7 @@ func iterNodes(infn string) <-chan []nodeAndWays {
     
     output := make(chan []nodeAndWays)
     go func() {
-        for bl:=range readfile.CollectExtendedBlockChans(blcks,false) {
+        for bl:=range readfile.CollectExtendedBlockChans(blcks) {
             if (bl.Idx()%10000)==0 {
                 debug.FreeOSMemory()
             }

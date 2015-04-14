@@ -34,12 +34,16 @@ func (qp *qtPacked) String() string {
 }
 
 func makeQtPacked(e elements.Element, qt quadtree.Quadtree) elements.Element {
+    //usually, we are going to sort these values in an AllocBlockStore,
+    //which means we are going to Pack the element. Unpacking, setting the
+    //quadtree and repacking is fairly expensive: this is quite a bit
+    //quicker.
     
     orig := e.Pack()
     if orig[10] != 0 && orig[10]!=1 {
         panic(fmt.Sprintf("already has quadtree... %d",orig[10]))
     }
-    
+    // insert new quadtree value into original packed data
     nv := make([]byte, len(orig)+10)
     copy(nv, orig[:10])
     p := utils.WriteVarint(nv,10,int64(qt))
@@ -48,23 +52,6 @@ func makeQtPacked(e elements.Element, qt quadtree.Quadtree) elements.Element {
     
     return &qtPacked{e.ChangeType(),e.Type(),e.Id(),qt, nv}
 }
-    
-    
-func getSortedChan(data func(func(int,elements.ExtendedBlock) error) error) <-chan elements.ExtendedBlock {
-    
-    iter := make(chan elements.ExtendedBlock)
-    add := func(i int, e elements.ExtendedBlock) error {
-        iter <- e
-        return nil
-    }
-    go func() {
-        data(add)
-        close(iter)
-    }()
-    
-    return SortExtendedBlockChan(iter)
-}
-    
     
 type blockPair struct {
     main elements.ExtendedBlock
@@ -110,11 +97,13 @@ func AddQts(
                 q:=qtb.Element(qti)
                 
                 if e.Type()<q.Type() || e.Id()<q.Id() {
+                    //mising qt, so skip value
                     fmt.Printf("No qt for object %s,{%s}\n", e, q)
                     pp.qts[i] = quadtree.Null
                 } else if e.Type()>q.Type() || e.Id()>q.Id() {
                     
                     for ok && (e.Type()>q.Type() || e.Id()>q.Id()) {
+                        //mising object, so skip
                         fmt.Printf("no object for qt %s{%s}\n", q, e)
                         qti++
                         for ok && qti==qtb.Len() {
@@ -126,24 +115,17 @@ func AddQts(
                         } 
                     }
                 } else {
-                    /*
-                    
-                                                
-                if e.Type()!=q.Type() || e.Id()!=q.Id() {
-                                       
-                    
-                    panic("out of sync")
-                }*/
                     qq,ok:=q.(interface{Quadtree() quadtree.Quadtree})
                     if !ok {
                         panic("no quadtree")
                     }
+                    //found both, store quadtree
                     pp.qts[i] = qq.Quadtree()
                     qti++
                 }
                 
             }
-            //println(pp.main.Idx(),pp.main.Len(),len(pp.qts))
+            
             qtj[bl.Idx()%nc] <- pp
         }
         if qti != qtb.Len() {

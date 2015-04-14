@@ -18,7 +18,8 @@ import (
     "errors"
     //"fmt"
 )
-
+// GetHeaderBlock reads the header block from the given file, returning
+// the opened file and read.HeaderBlock
 func GetHeaderBlock(fn string) (*os.File, *read.HeaderBlock,error) {
     fl,err := os.Open(fn)
     if err!=nil {
@@ -44,7 +45,8 @@ func GetHeaderBlock(fn string) (*os.File, *read.HeaderBlock,error) {
     return fl,hb,nil
 }
 
-
+// MakeFileBlockChanSplitPartial reads the blocks at locations locs from
+// input file fn, returning as nc parallel channels
 func MakeFileBlockChanSplitPartial(fn string, nc int, locs []int64) ([]<-chan pbffile.FileBlock, error) {
     fl,err := os.Open(fn)
     if err!=nil { return nil,err}
@@ -62,12 +64,14 @@ func getPartialLocs(fn string, passQt func(quadtree.Quadtree) bool) ([]int64, bo
     for i:=0; i < hb.Index.Len(); i++ {
         q:=hb.Index.Quadtree(i)
         if passQt(q) {
+            //add location if qt passes
             locs=append(locs, hb.Index.Filepos(i))
-            isc = isc || hb.Index.IsChange(i)
+            isc = isc || hb.Index.IsChange(i) //isc if at least one block is a change
         }
     }
     return locs,isc,nil
 }
+
 
 func ReadExtendedBlockMultiSortedQts(fn string, nc int, passQt func(quadtree.Quadtree) bool) (<-chan elements.ExtendedBlock, error) {
     

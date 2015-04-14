@@ -140,6 +140,7 @@ func ReadHeaderBlock(indata []byte, filePos int64) (*HeaderBlock, error) {
 		switch msg.Tag {
 		case 4, 5, 16, 17:
 			if ans.Features == nil {
+                // set up features map
 				ans.Features = map[string][]string{}
 			}
 
@@ -163,6 +164,7 @@ func ReadHeaderBlock(indata []byte, filePos int64) (*HeaderBlock, error) {
 		case 17:
 			ans.Features["source"] = append(ans.Features["source"], string(msg.Data))
 		case 22:
+            // index of file blocks
 			if idx == nil || cap(idx) == 0 {
 				idx = make(blockIdxSlice, 0, 350000)
 			}
@@ -176,7 +178,9 @@ func ReadHeaderBlock(indata []byte, filePos int64) (*HeaderBlock, error) {
 		}
 		a, msg = utils.ReadPbfTag(indata, a)
 	}
+    
 	if len(idx) != 0 {
+        // calculate block positions: cumulative sum of block lens (plus length of header block)
 		for i, a := range idx {
 			idx[i].filepos = filePos
 			filePos += a.blockLen

@@ -38,7 +38,7 @@ func SortElementsById(
         return nil,err
     }
     
-    return sortAndGroupTiles(readfile.CollectExtendedBlockChans(toSort,false),groupSize,endDate,nc)
+    return sortAndGroupTiles(readfile.CollectExtendedBlockChans(toSort),groupSize,endDate,nc)
 }
 
 

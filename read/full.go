@@ -15,13 +15,13 @@ import (
 )
 
 type readObjsFull struct {
-    Info   bool
+    Info   bool  //config settings
     Tags   bool
     //Change  bool
 }
 
 func (rof readObjsFull) addType(e elements.ElementType) bool {
-    return true
+    return true //i.e. return all objects
 }
 
 // ReadExtendedBlock returns an ExtendedBlock (with extra block metadata)
@@ -34,8 +34,9 @@ func ReadExtendedBlock(idx int, buf []byte, change bool) (elements.ExtendedBlock
 }
 
 func readStrings(buf []byte, st []string) ([]string, error) {
-    ii,err := utils.ReadPackedList(buf)
+    ii,err := utils.ReadPackedList(buf) //decode slice of ids
     if err!=nil { return nil, err}
+    
     ans:=make([]string,len(ii))
     for i,id := range ii {
         ans[i] = st[id]
@@ -44,11 +45,12 @@ func readStrings(buf []byte, st []string) ([]string, error) {
 }
 
 func readStringsDelta(buf []byte, st []string) ([]string, error) {
-    ii,err := utils.ReadDeltaPackedList(buf)
+    ii,err := utils.ReadDeltaPackedList(buf) //decode slice of delta packed ids
     if err!=nil { return nil, err}
+    
     ans:=make([]string,len(ii))
     for i,id := range ii {
-        ans[i] = st[id]
+        ans[i] = st[id] //fetch each string
     }
     return ans,nil
 }
@@ -62,12 +64,12 @@ func readInfo(buf []byte, st []string) (elements.Info, error) {
     pos,msg := utils.ReadPbfTag(buf,0)
     for ; msg.Tag>0; pos,msg=utils.ReadPbfTag(buf,pos) {
         switch msg.Tag { 
-            case 1: vs = int64(msg.Value)
-            case 2: ts = elements.Timestamp(msg.Value)
-            case 3: cs = elements.Ref(msg.Value)
-            case 4: ui = int64(msg.Value)
-            case 5: us = st[msg.Value]
-            case 6: vv = msg.Value!=0
+            case 1: vs = int64(msg.Value)               //version
+            case 2: ts = elements.Timestamp(msg.Value)  //timestamp
+            case 3: cs = elements.Ref(msg.Value)        //changeset
+            case 4: ui = int64(msg.Value)               //user id
+            case 5: us = st[msg.Value]                  //user
+            case 6: vv = msg.Value!=0                   //visible
         }
     }
     return elements.MakeInfo(vs,ts,cs,ui,us,vv), nil
@@ -89,8 +91,8 @@ func (r readObjsFull) readCommon(buf []byte, st []string) (elements.Ref, element
     for ; msg.Tag>0; pos,msg=utils.ReadPbfTag(buf,pos) {
         switch msg.Tag {
             case 1: id=elements.Ref(msg.Value)
-            case 2: if (r.Info) { kk,err=readStrings(msg.Data, st) }
-            case 3: if (r.Info) { vv,err=readStrings(msg.Data, st) }
+            case 2: if (r.Info) { kk,err=readStrings(msg.Data, st) } // tag keys
+            case 3: if (r.Info) { vv,err=readStrings(msg.Data, st) } // tag values
             case 4: if (r.Info) { info,err=readInfo(msg.Data, st)  }
             case 20: qt=quadtree.Quadtree(utils.UnZigzag(msg.Value))
             default:
@@ -136,7 +138,7 @@ func (r readObjsFull) way(buf []byte, st []string, ct elements.ChangeType) (elem
     rfsi := []int64{}
     for _,m := range rem {
         switch m.Tag {
-            case 8: rfsi,err = utils.ReadDeltaPackedList(m.Data)
+            case 8: rfsi,err = utils.ReadDeltaPackedList(m.Data) // node refs
         }
         if err!=nil { return nil,err }
     }
@@ -158,9 +160,9 @@ func (r readObjsFull) relation(buf []byte, st []string, ct elements.ChangeType) 
     tyy,rfsi,rl := []uint64{}, []int64{}, []string{}
     for _,m := range rem {
         switch m.Tag {
-            case 8: rl,err=readStrings(m.Data, st)
-            case 9: rfsi,err=utils.ReadDeltaPackedList(m.Data)
-            case 10: tyy,err=utils.ReadPackedList(m.Data)
+            case 8: rl,err=readStrings(m.Data, st) // member roles
+            case 9: rfsi,err=utils.ReadDeltaPackedList(m.Data) // member
+            case 10: tyy,err=utils.ReadPackedList(m.Data) // member types
         }
         if err!=nil { return nil,err}
     }
@@ -194,15 +196,15 @@ func readDenseInfo(buf []byte, st []string) ([]elements.Info, error) {
     pos,msg := utils.ReadPbfTag(buf,0)
     for ; msg.Tag>0; pos,msg = utils.ReadPbfTag(buf,pos) {
         switch msg.Tag {
-            case 1: vs,err = utils.ReadPackedList(msg.Data)
-            case 2: ts,err = utils.ReadDeltaPackedList(msg.Data)
-            case 3: cs,err = utils.ReadDeltaPackedList(msg.Data)
-            case 4: ui,err = utils.ReadDeltaPackedList(msg.Data)
+            case 1: vs,err = utils.ReadPackedList(msg.Data) // version: NOT delta packed
+            case 2: ts,err = utils.ReadDeltaPackedList(msg.Data) // timestamp
+            case 3: cs,err = utils.ReadDeltaPackedList(msg.Data) // changeset
+            case 4: ui,err = utils.ReadDeltaPackedList(msg.Data) // user_id
             case 5: 
                 if st!=nil {
-                    us,err = readStringsDelta(msg.Data, st)
+                    us,err = readStringsDelta(msg.Data, st) // users
                 }
-            case 6: vv,err = utils.ReadPackedList(msg.Data)
+            case 6: vv,err = utils.ReadPackedList(msg.Data) // visible: NOT delta packed
         }
         if err!=nil {
             return nil, err
@@ -213,11 +215,11 @@ func readDenseInfo(buf []byte, st []string) ([]elements.Info, error) {
         
         u := ""
         if i < len(us) {
-            u = us[i]
+            u = us[i] // get user
         }
         vis := true
         if i < len(vv) {
-            vis=vv[i]!=0
+            vis=vv[i]!=0 // visible defaults to true if not present
         }
         res[i] = elements.MakeInfo(int64(v), elements.Timestamp(ts[i]), elements.Ref(cs[i]), ui[i], u,vis)
     }
@@ -250,9 +252,10 @@ func (r readObjsFull) dense(buf []byte, st []string, objs elements.ByElementId, 
     }
     kvp := 0
     for i,id := range ids {
+        // tags: key and value in turn, elements seperated by a zero
         kk,vv := []string{},[]string{}
         for kvp < len(kv) && kv[kvp] != 0 {
-            kk = append(kk, st[kv[kvp]])
+            kk = append(kk, st[kv[kvp]]) // fetch string 
             vv = append(vv, st[kv[kvp+1]])
             kvp+=2
         }

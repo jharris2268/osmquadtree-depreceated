@@ -183,7 +183,8 @@ func (qt Quadtree) Bounds(buffer float64) Bbox {
     
 }
 
-//Nb. y=0 is north
+//Tile coordinate as (x,y,z), with y at the top (nb. tile filenames
+// usually <z>/<x>/<y>.png).
 func (qt Quadtree) Tuple() (int64,int64,int64) {
     z := int64(qt & 31)
 	x := int64(0)

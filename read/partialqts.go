@@ -15,6 +15,8 @@ import (
    
 )
 
+//only read element id, quadtree and changetype
+
 type nodeqt struct {
     ref, qt int64
     ct byte

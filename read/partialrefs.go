@@ -17,6 +17,8 @@ import (
 
 var missingData = errors.New("Missing Data")
 
+// only read element id
+
 type noderef int64
 type wayref int64
 type relref int64
