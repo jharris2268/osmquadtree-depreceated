@@ -85,6 +85,42 @@ func makeLinestringGeometry(gp elements.FullElement, tg elements.Tags, coords []
     return &linestringGeometryImpl{gp.ChangeType(), i, gp.Info(), tg, gp.Quadtree(),coords, zorder, bb}
 }
 
+func reverseCoords(cc []Coord) {
+    lc:=len(cc)-1
+    for i:=0; i < len(cc)/2; i++ {
+        cc[i],cc[lc-i] = cc[lc-i],cc[i]
+    }
+}
+
+func PartialLinestringGeometry(ls LinestringGeometry, fr int, to int) LinestringGeometry {
+    var coords []Coord
+    
+    if to < fr {
+        coords=make([]Coord,0,fr-to+1)
+        for i:=fr; i > to-1; i-- {
+            coords=append(coords, ls.Coord(i))
+        }
+    } else {
+        coords=make([]Coord,0,to-fr+1)
+        for i:=fr; i < to+1; i++ {
+            coords=append(coords, ls.Coord(i))
+        }
+    }
+    
+    ts,ok:=ls.Tags().(TagsEditable)
+    if !ok {
+        ts = MakeTagsEditable(ls.Tags())
+    }
+    ts.Put("from", fmt.Sprintf("%d",fr))
+    ts.Put("to", fmt.Sprintf("%d",to))
+    return makeLinestringGeometry(ls, ts, coords, ls.ZOrder())
+}
+    
+    
+    
+    
+    
+
 type polygonGeometryImpl struct {
     ct   elements.ChangeType
     id   elements.Ref
@@ -198,6 +234,8 @@ func (pt *pointGeometryImpl) AsWkt(prj bool) string { return fmt.Sprintf("POINT(
 func (ln *linestringGeometryImpl) AsWkt(prj bool) string { return fmt.Sprintf("LINESTRING%s", ringWkt(ln.coords, prj)) }
 func (py *polygonGeometryImpl) AsWkt(prj bool) string { return polyWkt(py.coords, prj) }
 
+func LinestringWkt(cc []Coord, prj bool) string { return fmt.Sprintf("LINESTRING%s", ringWkt(cc, prj)) }
+
 func ptWkt(c Coord, prj bool) string {
     x,y := c.LonLat()
     if prj {
@@ -263,7 +301,11 @@ func (pt *pointGeometryImpl) AsWkb(prj bool) []byte {
     return append([]byte{0,0,0,0,1}, ptWkb(pt.coord, prj)...)
 }
 func (ln *linestringGeometryImpl) AsWkb(prj bool) []byte {
-    return append([]byte{0,0,0,0,2}, ringWkb(ln.coords, prj)...)
+    return LinestringWkb(ln.coords, prj)
+}
+
+func LinestringWkb(cc []Coord, prj bool) []byte {
+    return append([]byte{0,0,0,0,2}, ringWkb(cc, prj)...)
 }
         
 func (py *polygonGeometryImpl) AsWkb(prj bool) []byte {
@@ -370,7 +412,11 @@ func (pt *pointGeometryImpl) AsGeoJson(asMerc bool) interface{} {
 }
 func (ln *linestringGeometryImpl) AsGeoJson(asMerc bool) interface{} {
     
-    return map[string]interface{}{"type":"LineString","coordinates":coordSliceGeom(ln.coords,asMerc)}
+    return LinestringGeoJson(ln.coords,asMerc)
+}
+
+func LinestringGeoJson(cc []Coord, asMerc bool) interface{} {
+    return map[string]interface{}{"type":"LineString","coordinates":coordSliceGeom(cc,asMerc)}
 }
 
 func (py *polygonGeometryImpl) AsGeoJson(asMerc bool) interface{} {

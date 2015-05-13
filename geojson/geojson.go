@@ -69,6 +69,10 @@ func writeOsmJson(sblc <-chan utils.Idxer, outfn string, header string, footer s
 	return tb, bc, nil
 }
 
+// MakeFeature convers a geometry element o into map[string]interface{}
+// suitable for marshalling into a GeoJSON file. If asMerc is true, //
+// project coordinates into espg 900913, otherwise write as latitude and
+// longitude.
 func MakeFeature(o geometry.Geometry, asMerc bool) (map[string]interface{}, error) {
     om := map[string]interface{}{}
     om["type"] = "Feature"
@@ -100,19 +104,26 @@ func MakeFeature(o geometry.Geometry, asMerc bool) (map[string]interface{}, erro
     return om,nil
 }
 
-func MakeFeatureCollection(bl elements.ExtendedBlock, asMerc bool) map[string]interface{} {
+// MakeFeatureCollection converts an elements.ExtendedBlock, containg only
+// Geometry elements, into a map[string]interface{} suitable for 
+// marshalling into a GeoJSON file. If asMerc is true, project coordinates
+// into espg 900913, otherwise write as latitude and longitude.
+func MakeFeatureCollection(bl elements.ExtendedBlock, asMerc bool) (map[string]interface{},error) {
 	bll := map[string]interface{}{}
 	bll["type"] = "FeatureCollection"
 	ps := map[string]interface{}{}
-	ps["quadtree"] = bl.Quadtree().String()
+    if bl.Quadtree()>=0 {
+        ps["quadtree"] = bl.Quadtree().String()
+    }
 	bt := bl.Tags()
 	if bt != nil {
 		for i := 0; i < bt.Len(); i++ {
 			ps[bt.Key(i)] = bt.Value(i)
 		}
 	}
-
-	bll["properties"] = ps
+    if len(ps)>0 {
+        bll["properties"] = ps
+    }
 
 	oo := make([]interface{}, bl.Len())
 	for i, _ := range oo {
@@ -120,19 +131,19 @@ func MakeFeatureCollection(bl elements.ExtendedBlock, asMerc bool) map[string]in
         
 		o, err := geometry.ExtractGeometry(bl.Element(i))
 		if err != nil {
-			panic(err.Error())
+			return nil,err
 		}
 		
         om, err := MakeFeature(o, asMerc)
         if err != nil {
-			panic(err.Error())
+			return nil,err
 		}
         
 		oo[i] = om
 	}
 
 	bll["features"] = oo
-	return bll
+	return bll,nil
 }
 
 //Write a stream of elements.ExtendedBlock, containing Geometry elements,
@@ -142,8 +153,10 @@ func WriteGeoJson(sblc <-chan elements.ExtendedBlock, outfn string) (int, int, e
 	go func() {
 		for bl := range sblc {
 
-			bll := MakeFeatureCollection(bl, false)
-
+			bll,err := MakeFeatureCollection(bl, false)
+            if err != nil {
+				panic(err.Error())
+			}
 			blc, err := json.Marshal(bll)
 			if err != nil {
 				panic(err.Error())

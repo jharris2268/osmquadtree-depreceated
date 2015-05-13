@@ -12,9 +12,8 @@ import (
     "github.com/jharris2268/osmquadtree/pbffile"
     "github.com/jharris2268/osmquadtree/readfile"
     "github.com/jharris2268/osmquadtree/quadtree"
-    //"sync"
+    
     "os"
-    //"sort"
     "fmt"
     "io/ioutil"
     "io"
@@ -83,91 +82,6 @@ func addOrigBlock(bl elements.ExtendedBlock, bh []byte) (utils.Idxer,error) {
     return &idxData{bl.Idx(),b, quadtree.Null},err
 }
 
-
-
-/*
-func WritePbfFilezz(inc <-chan elements.ExtendedBlock, outfn string, idx bool, isc bool, plain bool) (write.BlockIdxWrite,error) {
-    outf,err:=os.Create(outfn)
-    if err!=nil {
-        return nil,err
-    }
-    defer outf.Close()
-    
-    if !idx {
-        return WritePbfIndexedzz(inc, outf, nil, idx, isc, plain)
-    }
-    
-    tf,err := ioutil.TempFile("","osmquadtree.writefile.tmp")
-    if err!=nil {
-        return nil,err
-    }
-        
-    
-    defer func() {
-        tf.Close()
-        os.Remove(tf.Name())
-    }()
-        
-    return WritePbfIndexedzz(inc, outf, tf, idx, isc, plain)
-    
-}
-    
-func WritePbfIndexedzz(inc <-chan elements.ExtendedBlock, outf io.Writer, tf io.ReadWriter, idx bool, isc bool, plain bool) (write.BlockIdxWrite,error) {
-    
-    //mt := sync.Mutex{}
-    //qm := map[int]quadtree.Quadtree{}
-    addBl := func(bl elements.ExtendedBlock,i int) (utils.Idxer,error) {
-        //mt.Lock()
-        //qm[bl.Idx()] = bl.Quadtree()
-        //mt.Unlock()
-        return addFullBlock(bl,i,isc,[]byte("OSMData"))
-    }
-    
-    if !idx {
-        if plain {
-            addBl = func(bl elements.ExtendedBlock, i int) (utils.Idxer,error) {
-                return addOrigBlock(bl,[]byte("OSMData"))
-            }
-        }
-        
-        return writeUnIndexedzz(inc,outf,isc,addBl)
-        
-        
-    }
-    
-    
-    ii,err := WriteBlockszz(inc,tf,addBl,false,false)
-    //ii,err := WriteBlocksOrdered(inc,tf,addBl)
-    if err!=nil {
-        return nil,err
-    }
-    
-    return finishAndHeader(outf, tf, ii,isc)
-}
-
-func writeUnIndexedzz(inc <- chan elements.ExtendedBlock, outf io.Writer, isc bool,
-    addBl func(bl elements.ExtendedBlock,i int) (utils.Idxer,error) ) (write.BlockIdxWrite,error) {
-    
-    ii,err := WriteBlockszz(inc,outf,addBl,isc,false)
-        
-    if err!=nil { return nil,err}
-    if ii==nil {
-        return nil,nil
-    }
-        
-    //sort.Sort(blockIdx(ii))
-    for i,_:=range ii {
-        
-        
-        //ii[i].Quadtree=qm[i]
-        ii[i].Isc=isc
-    }
-    
-    
-    return blockIdx(ii),err
-}
-*/
-
 func finishAndHeader(outf io.Writer, tf io.ReadWriter, ii []IdxItem,isc bool) (write.BlockIdxWrite,error) {
     
     tfs,ok := tf.(interface{
@@ -189,11 +103,7 @@ func finishAndHeader(outf io.Writer, tf io.ReadWriter, ii []IdxItem,isc bool) (w
         }
     }
     
-    //sort.Sort(blockIdx(ii))
     for i,_:=range ii {
-        
-        
-        //ii[i].Quadtree=qm[i]
         ii[i].Isc=isc
     }
     
@@ -384,83 +294,4 @@ func WriteBlocksOrdered(
     
     return items, nil
 }
- 
-/*
-func WriteBlockszz(inc <-chan elements.ExtendedBlock,
-    outf io.Writer,
-    addBlock func(elements.ExtendedBlock, int) (utils.Idxer,error),
-    off bool, prog bool ) ([]IdxItem,error) {
-
-
-
-    outc:=make(chan utils.Idxer)
-    
-    go func() {
-        wg:=sync.WaitGroup{}
-        wg.Add(4)
-        fo:=0
-        if off {
-        
-            fb := <- inc
-            
-            fo := fb.Idx()
-            
-            t,err := addBlock(fb,fo)
-            if err!=nil {
-                panic(err.Error())
-            }
-            outc <- t
-        }
-        
-        for i:=0; i < 4; i++ {
-            go func(i int) {
-                //z:=0
-                //l:=0
-                for bl:=range inc {
-                    t,err := addBlock(bl,fo)
-                    if err!=nil {
-                        panic(err.Error())
-                    }
-                    outc <- t
-                    //z++
-                    //l = bl.Idx()
-                }
-                //println("finished",i,"(",z,"blocks, last", l,")")
-                wg.Done()
-            }(i)
-        }
-        wg.Wait()
-        //println("done, closing outc")
-        close(outc)
-    }()
-    
-    st:=time.Now()
-    items:=make([]IdxItem, 0, 450000)
-    for p:=range utils.SortIdxerChan(outc) {
-        
-        d:=p.(DataQuadtreer)
-        if d.Data()!=nil {
-            
-            
-            
-            pbffile.WriteFileBlock(outf,d.Data())
-            items=append(items, IdxItem{p.Idx(),d.Quadtree(),int64(len(d.Data())),false})
-            
-            if prog && (p.Idx()%12874)==0 {
-                
-                fmt.Println(items[len(items)-1],time.Since(st).Seconds())
-            }
-            
-        } else {
-            println("null data @", p.Idx())
-            items=append(items, IdxItem{p.Idx(),d.Quadtree(),int64(0),false})
-        }
-    }
-    
-    
-    return items, nil
-}
-*/    
-        
-            
     

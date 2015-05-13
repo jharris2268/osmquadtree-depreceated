@@ -47,6 +47,11 @@ func (bbox Bbox) String() string {
             bbox.Maxx,bbox.Maxy)
 }
 
+func BboxFromSlice(sl []int64) Bbox {
+    if len(sl)!=4 { return *NullBbox() }
+    return Bbox{sl[0],sl[1],sl[2],sl[3]}
+}
+
 //Return true if bbox overlaps other
 func (bbox Bbox) Intersects(other Bbox) bool {
     if (bbox.Minx > other.Maxx) { return false }

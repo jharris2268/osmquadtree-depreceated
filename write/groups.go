@@ -145,7 +145,8 @@ func packDense(bl elements.Block, stm map[string]int, from int, to int, writeExt
     
     ii,qt,ln,lt := mki(),mki(),mki(),mki()
     kvs:=make([]uint64,0,(to-from)*5)
-    i_vs,i_ts,i_cs,i_ui,i_us := mku(),mki(),mki(),mki(),mki()
+    i_vs,i_ts,i_cs,i_ui,i_us,i_vv := mku(),mki(),mki(),mki(),mki(),mku()
+    all_visible:=true
     if !writeExtra {
         qt=nil
     }
@@ -193,12 +194,18 @@ func packDense(bl elements.Block, stm map[string]int, from int, to int, writeExt
                 i_cs[i]=int64(fe.Info().Changeset())
                 i_ui[i]=int64(fe.Info().Uid())
                 i_us[i]=getStringI(fe.Info().User(), stm)
+                if fe.Info().Visible() {
+                    i_vv[i] = 1
+                } else {
+                    all_visible = false
+                }
             } else {
                 i_vs=nil
                 i_ts=nil
                 i_cs=nil
                 i_ui=nil
                 i_us=nil
+                i_vv=nil
             }
         }        
     }
@@ -214,6 +221,10 @@ func packDense(bl elements.Block, stm map[string]int, from int, to int, writeExt
         infi[2].Data,_ = utils.PackDeltaPackedList(i_cs)
         infi[3].Data,_ = utils.PackDeltaPackedList(i_ui)
         infi[4].Data,_ = utils.PackDeltaPackedList(i_us)
+        if !all_visible {
+            vvp,_:=utils.PackPackedList(i_vv)
+            infi = append(infi, utils.PbfMsg{6,vvp,0})
+        }
         info = infi.Pack()
     }
     
@@ -261,13 +272,17 @@ func packElement(e elements.Element, stm map[string]int, writeExtra bool) (uint6
     ei,ok := e.(interface{Info() elements.Info})
     if ok && ei.Info()!=nil {
         
-        ii := make(utils.PbfMsgSlice,5)
-        ii[0]=utils.PbfMsg{1,nil,uint64(ei.Info().Version())}
-        ii[1]=utils.PbfMsg{2,nil,uint64(ei.Info().Timestamp())}
-        ii[2]=utils.PbfMsg{3,nil,uint64(ei.Info().Changeset())}
-        ii[3]=utils.PbfMsg{4,nil,uint64(ei.Info().Uid())}
+        ii := make(utils.PbfMsgSlice,0,6)
+        ii = append(ii,utils.PbfMsg{1,nil,uint64(ei.Info().Version())}) // NOT zigzag encoded
+        ii = append(ii,utils.PbfMsg{2,nil,uint64(ei.Info().Timestamp())})
+        ii = append(ii,utils.PbfMsg{3,nil,uint64(ei.Info().Changeset())})
+        ii = append(ii,utils.PbfMsg{4,nil,uint64(ei.Info().Uid())})
         us,_ := getString(ei.Info().User(),stm)
-        ii[4]=utils.PbfMsg{5,nil,us}
+        ii = append(ii,utils.PbfMsg{5,nil,us})
+        if !ei.Info().Visible() {
+            ii = append(ii,utils.PbfMsg{6,nil,0})
+        }
+                        
         msgs = append(msgs, utils.PbfMsg{4, ii.Pack(),0 })
     }
     if writeExtra {
@@ -339,8 +354,8 @@ func packMembers(mm elements.Members, stm map[string]int) ([]byte,[]byte,[]byte)
     rl:=make([]uint64,mm.Len())
     
     for i,_ :=range ii {
-        ii[i] = int64(mm.Ref(i))
-        ty[i] = uint64(mm.MemberType(i))
+        ii[i] = int64(mm.Ref(i)) //delta packed
+        ty[i] = uint64(mm.MemberType(i)) 
         rl[i],_ = getString(mm.Role(i), stm)
     }
     b,_ := utils.PackDeltaPackedList(ii)

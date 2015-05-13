@@ -30,6 +30,9 @@ type locTestPolygon struct {
 	bb    *quadtree.Bbox
 }
 
+// MakeLocTestPolygon constructs a LocTest which checks if a point is within
+// the specified polygon. Note that the ContainsQuadtree function tests the four corners
+// of the quadtree only.
 func MakeLocTestPolygon(lons, lats []int64) LocTest {
     verts := make(lonLatSlice,len(lons))
     for i,ln := range lons {
@@ -168,6 +171,12 @@ func (tp locTestPolygonMulti) String() string {
 	return fmt.Sprintf("locTestPolygonMulti: %d polys, %d holes %s", len(tp.polys), len(tp.holes), tp.Bbox().String())
 }
 
+
+// ReadPolyFile reads the osmosis poly file fn (see
+// http://wiki.openstreetmap.org/wiki/Osmosis/Polygon_Filter_File_Format
+// ) and constructs a LocTest which returns true if a point is within the
+// polygon. Note that the ContainsQuadtree function tests the four corners
+// of the quadtree only.
 func ReadPolyFile(fn string) (LocTest, error) {
 	fl, err := os.Open(fn)
 	if err != nil {
@@ -220,7 +229,6 @@ func ReadPolyFile(fn string) (LocTest, error) {
 		} else {
 			label = ln
 			inply = true
-			//return nil, errors.Error("?? "+scan.Text()
 		}
 		i++
 	}
@@ -231,6 +239,5 @@ func ReadPolyFile(fn string) (LocTest, error) {
 		return res.polys[0], nil
 	}
 	return res, nil
-	//return nil,errors.New("not implemented")
-
+	
 }

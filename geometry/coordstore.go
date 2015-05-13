@@ -13,12 +13,19 @@ import (
     "errors"
 )
 
+// A CoordStore stores node location coordinates.
 type CoordStore interface {
-    Find(ref elements.Ref) (int64,int64,bool)
-    Len() int
-    AsCoordSlice() []Coord
+    // Find returns (lon,lat,true) if ref is present, (0,0,false) if not.
+    Find(ref elements.Ref) (int64,int64,bool) 
+    Len() int // Len() returns number of coordinates stored.
 }
 
+// CoordBlockStore stores the node location coordinates for blocks of elements,
+// for as long as they are useful. Calling Add removes existing blocks
+// with quadtree values which are not parents / antecendants of the new
+// block, before adding the the node locations of this new block. This
+// means we need only store 18 blocks of data at once, resulting in low
+// memory usage.
 type CoordBlockStore interface {
     CoordStore
     Add(elements.ExtendedBlock)
@@ -58,28 +65,23 @@ type mapCoordStore map[elements.Ref]lonLat
 
 func (mcs mapCoordStore) Find(ref elements.Ref) (int64,int64,bool) {
     ll,ok := mcs[ref]
-    return ll.lon,ll.lat,ok
+    return ll.lon,ll.lat,ok // will return 0,0,false if ref not present
+    // nb. 0,0,true would be a real answer
 }
 
 func (mcs mapCoordStore) Len() int { return len(mcs) }
-func (mcs mapCoordStore) AsCoordSlice() []Coord {
-    rr:=make([]Coord,0,len(mcs))
-    for k,v := range mcs {
-        rr=append(rr, coordImpl{k,v.lon,v.lat})
-    }
-    return rr
-}
 
 type mapCoordBlockStore map[quadtree.Quadtree]CoordStore
 
 func (mcbs mapCoordBlockStore) Find(ref elements.Ref) (int64,int64,bool) {
-    for _,v:=range mcbs {
+    for _,v:=range mcbs { // try each tile in turn: can only ever be 18 tiles to look at
         a,b,c:= v.Find(ref)
-        if c {
+        if c { // found it, so return
             return a,b,c
         }
     }
-    return 0,0,false
+    
+    return 0,0,false // not present in any tile
 }
 
 func (mcbs mapCoordBlockStore) Len() int  {
@@ -90,18 +92,8 @@ func (mcbs mapCoordBlockStore) Len() int  {
     return r
 }
 
-func (mcbs mapCoordBlockStore) AsCoordSlice() []Coord {
-    rs := make([]Coord, mcbs.Len())
-    i:=0
-    
-    for _,v:=range mcbs {
-        copy(rs[i:], v.AsCoordSlice())
-        i+=v.Len()
-    }
-    return rs
-}
-
 func (mcbs mapCoordBlockStore) Add(bl elements.ExtendedBlock) {
+    // add each node location to a new mapCoordStore
     nt := mapCoordStore{}
     for i:=0; i< bl.Len();i++ {
         e:=bl.Element(i)
@@ -116,26 +108,38 @@ func (mcbs mapCoordBlockStore) Add(bl elements.ExtendedBlock) {
         nt[e.Id()] = lonLat{ll.Lon(),ll.Lat()}
     }
     
+    
+    // ---
+    // delete tiles we are finished with
     q := bl.Quadtree()
     tr:=make(quadtree.QuadtreeSlice,0,len(mcbs))
-    for k,_:=range mcbs {
-        if k.Common(q)!=k {
-            tr=append(tr,k)
+    for k,_:=range mcbs { // iterate over current tiles
+        if k.Common(q)!=k { // if not a parent of new tile
+            tr=append(tr,k) // add to list
         }
         
     }
-    //println("delete",len(tr),"tiles")
     
     for _,t:=range tr {
-        mcbs[t]=nil
-        delete(mcbs,t)
+        mcbs[t]=nil // help GC
+        delete(mcbs,t) 
     }
+    // ----
+    
+    // add new tile to map
     mcbs[q]=nt
-    //println("have",len(mcbs),"tiles",mcbs.Len())
+    
 }
 
 func (mcbs mapCoordBlockStore) NumBlocks() int { return len(mcbs) }
 
+
+type Coorder interface {
+    Coords() []Coord
+}
+
+
+//extended way type, with added node locations. Satsifies elements.FullWay and Coorder
 
 type coordWay struct {
     id      elements.Ref
@@ -162,7 +166,7 @@ func (tw *coordWay) Ref(i int) elements.Ref { return tw.cc[i].Ref() }
 func (tw *coordWay) Coords() []Coord { return tw.cc }
 
 func (tw *coordWay) Pack() []byte {
-    
+    //will drop node coordinates, and unpack to a normal elements.FullWay
     return elements.PackFullElement(tw,elements.PackRefs(tw))
 }
 func (tw *coordWay) String() string {
@@ -190,6 +194,13 @@ func makeCoordWay(cbs CoordBlockStore, e elements.Element) (elements.Element,*qu
     return &ans,makeBbox(ans.cc),nil
 }
 
+// AddWayCoords converts the FullWay elements from the input chan inc into
+// an extended way type with the node locations added to it. These ways
+// also satisfy the Coorder interface type. It also filters out nodes
+// without tags and relations objects without a type tag of 
+// "boundary","multipolygon", or "route". If bx is not null
+// it also filters out nodes and ways not present within thay Bbox. The
+// input channel inc must be in quadtree order.
 func AddWayCoords(inc <- chan elements.ExtendedBlock, bx *quadtree.Bbox) <-chan elements.ExtendedBlock {
     ans := make(chan elements.ExtendedBlock)
     
@@ -197,6 +208,7 @@ func AddWayCoords(inc <- chan elements.ExtendedBlock, bx *quadtree.Bbox) <-chan 
         bs := mapCoordBlockStore{}
         idx:=0
         for bl := range inc {
+            //add coords to BlockStore bs
             bs.Add(bl)
             nr := make(elements.ByElementId,0, bl.Len())
             for i:=0; i < bl.Len(); i++ {
@@ -204,11 +216,12 @@ func AddWayCoords(inc <- chan elements.ExtendedBlock, bx *quadtree.Bbox) <-chan 
                 switch e.Type() {
                     case elements.Node:
                         fn := e.(elements.FullNode)
+                        // skip if outside of bounding box
                         if bx!=nil && !bx.ContainsXY(fn.Lon(),fn.Lat()) {
                             continue
                         }
                         
-                        
+                        // if we have tags, add to output
                         if fn.Tags()!=nil && fn.Tags().Len()>0 {
                             ne := elements.MakeNode(fn.Id(),
                                 fn.Info(),MakeTagsEditable(fn.Tags()),
@@ -226,6 +239,7 @@ func AddWayCoords(inc <- chan elements.ExtendedBlock, bx *quadtree.Bbox) <-chan 
                             fmt.Println(bl,fw)
                             panic(err.Error())
                         }
+                        // skip if entirely outside of bounding box
                         if bx!=nil && !bx.Intersects(*wbx) {
                             continue
                         }
@@ -242,10 +256,13 @@ func AddWayCoords(inc <- chan elements.ExtendedBlock, bx *quadtree.Bbox) <-chan 
                                         fr.Quadtree(),fr.ChangeType())                    
                     
                                     nr = append(nr, nl)
+                                //default:
+                                //  pass
                             }
                         }
                 }
             }
+            //skip empty blocks
             if len(nr)>0 {
                 ans <- elements.MakeExtendedBlock(idx,nr,bl.Quadtree(),bl.StartDate(),bl.EndDate(),nil)
                 idx++

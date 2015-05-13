@@ -42,7 +42,9 @@ func AdminLevels(tt TagsEditable, ss []string) bool {
     return true
 }
 
-func BusRouteList(tt TagsEditable, ss []string) bool {
+type RouteList string
+
+func (rl RouteList) Proc(tt TagsEditable, ss []string) bool {
     if ss==nil || len(ss) == 0 {
         return false
     }
@@ -57,7 +59,7 @@ func BusRouteList(tt TagsEditable, ss []string) bool {
     
     sort.Strings(ss)
     
-    tt.Put("bus_routes", strings.Join(ss, ";"))
+    tt.Put(string(rl), strings.Join(ss, ";"))
     return true
 }
 
@@ -88,12 +90,7 @@ func AddRelationRange(inc <-chan elements.ExtendedBlock, testRel func(TagsEditab
                         }
                         
                         
-                        if !testRel(tt) {
-                            
-                            continue
-                        }
-                        
-                        if tt.Has(srctag) {
+                        if testRel(tt) && tt.Has(srctag) {
                             v:=tt.Get(srctag)
                             for j:=0; j < fr.Len(); j++ { 
                                 if fr.MemberType(j) == elements.Way {
@@ -109,7 +106,7 @@ func AddRelationRange(inc <-chan elements.ExtendedBlock, testRel func(TagsEditab
                                 }
                             }
                             
-                        }
+                        } 
                 }
             }
             nb := make(elements.ByElementId, 0, bl.Len())

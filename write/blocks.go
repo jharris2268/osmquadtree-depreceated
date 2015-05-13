@@ -62,26 +62,31 @@ func packStringTable(stm map[string]int) ([]byte,error) {
         
     
     
-
-func WriteExtendedBlock(bl elements.ExtendedBlock, ischange bool, writeExtra bool) ([]byte,error) {
+//WriteExtendedBlock serializes the elements in block into a Pbf format
+//primitive block. If ischange is true, write changetypes; if writeExtra
+//is true write extra block attributes (quadtree, startdate, enddate and
+//tags, if present), and also write element quadtrees.
+func WriteExtendedBlock(block elements.ExtendedBlock, ischange bool, writeExtra bool) ([]byte,error) {
     
-    stm:=map[string]int{"!!!ZZtrt":0}
-    msgs, err := packBlock(bl, stm, ischange, writeExtra)
+    stm:=map[string]int{"!!!ZZtrt":0} //nonsense value stringtable starts at 1
+    //n.b. an empty string might be a real value
+    
+    msgs, err := packBlock(block, stm, ischange, writeExtra)
     
     if err!=nil { return nil, err }
     
-    if writeExtra {
-        if bl.Quadtree()!=quadtree.Null {
-            msgs = append(msgs, utils.PbfMsg{31, packQuadtree(bl.Quadtree()),0})
+    if writeExtra {// extensions to standard pbf format: skip if not present
+        if block.Quadtree()!=quadtree.Null {
+            msgs = append(msgs, utils.PbfMsg{31, packQuadtree(block.Quadtree()),0})
         }
-        if bl.StartDate()!=0 {
-            msgs = append(msgs, utils.PbfMsg{33, nil,uint64(bl.StartDate())})
+        if block.StartDate()!=0 {
+            msgs = append(msgs, utils.PbfMsg{33, nil,uint64(block.StartDate())})
         }
-        if bl.EndDate()!=0 {
-            msgs = append(msgs, utils.PbfMsg{34, nil,uint64(bl.EndDate())})
+        if block.EndDate()!=0 {
+            msgs = append(msgs, utils.PbfMsg{34, nil,uint64(block.EndDate())})
         }
-        if bl.Tags()!=nil {
-            kk,vv,err := packTags(bl.Tags(), stm)
+        if block.Tags()!=nil {
+            kk,vv,err := packTags(block.Tags(), stm)
             if err!=nil {
                 return nil,err
             }
@@ -96,20 +101,7 @@ func WriteExtendedBlock(bl elements.ExtendedBlock, ischange bool, writeExtra boo
     }
     msgs = append(msgs, utils.PbfMsg{1,st,0})
     
-    msgs.Sort()
+    msgs.Sort() 
     return msgs.Pack(), nil
 }
-    
-func WriteBlock(bl elements.Block, ischange bool, writeExtra bool) ([]byte, error) {
-    stm:=map[string]int{"!!!ZZtrt":0}
-    msgs, err := packBlock(bl, stm, ischange, writeExtra)
-    
-    if err!=nil { return nil, err }
 
-    st,err := packStringTable(stm)
-    if err!=nil {return nil,err }
-    
-    msgs = append(msgs, utils.PbfMsg{1,st,0})
-    msgs.Sort()
-    return msgs.Pack(), nil
-}

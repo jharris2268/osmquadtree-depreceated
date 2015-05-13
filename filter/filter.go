@@ -9,6 +9,10 @@ import (
 	//"github.com/jharris2268/osmquadtree/readfile"
 	"github.com/jharris2268/osmquadtree/elements"
 	"github.com/jharris2268/osmquadtree/quadtree"
+    "github.com/jharris2268/osmquadtree/utils"
+    
+    "strings"
+    "fmt"
 	
     //"sync"
 )
@@ -165,6 +169,45 @@ func (bb locTestBbox) String() string {
 func AsLocTest(bbox quadtree.Bbox) LocTest {
 	return locTestBbox(bbox)
 }
+
+
+func readBbox(f string) *quadtree.Bbox {
+    if f=="planet" {
+        return quadtree.PlanetBbox()
+    }
+    t:=strings.Split(f,",")
+    if len(t)!=4 {
+        return quadtree.NullBbox()
+    }
+    
+    mx,_,err := utils.ParseStringInt(t[0])
+    if err!=nil { return quadtree.NullBbox() }
+    my,_,err := utils.ParseStringInt(t[1])
+    if err!=nil { return quadtree.NullBbox() }
+    Mx,_,err := utils.ParseStringInt(t[2])
+    if err!=nil { return quadtree.NullBbox() }
+    My,_,err := utils.ParseStringInt(t[3])
+    if err!=nil { return quadtree.NullBbox() }
+    return &quadtree.Bbox{mx,my,Mx,My}
+    
+}
+
+func MakeLocTest(f string) LocTest {
+    if strings.HasSuffix(f, ".poly") {
+        locTest,err := ReadPolyFile(f)
+        if err!=nil { panic(err.Error()) }
+        return locTest
+    }
+    
+    if f!="" {
+        fbx := readBbox(f)
+        fmt.Println(fbx)
+        return AsLocTest(*fbx)
+    }
+    fbx := quadtree.PlanetBbox()
+    return AsLocTest(*fbx)
+}   
+   
 
 
 func MakeIdSet(bm bool) IdSet {

@@ -40,6 +40,8 @@ func nodeTags(tags TagsEditable, tagsFilter map[string]TagTest) bool {
     return isfeat
 }
 
+// IsFeature returns true if at least one tag key from tags is marked as
+// IsFeature in tagsFilter
 func IsFeature(tags elements.Tags, tagsFilter map[string]TagTest) bool {
     for i := 0; i < tags.Len(); i++ {
         k:=tags.Key(i)
@@ -84,7 +86,12 @@ func wayTags(tags TagsEditable, tagsFilter map[string]TagTest) (int64,bool) {
 }
 
 
-
+// MakeGeometries converts the nodes and ways of input chan inc into
+// Point, Linestring and Polygon geometries. Tags are filtered by tagsFilter.
+// Note that the way objects must also satisify the Coorder interface, 
+// so the input chan inc should be be result of AddWayCoords. Relations
+// objects are passed to the output chanel directly: these are handled by
+// HandleRelations.
 func MakeGeometries(inc <-chan elements.ExtendedBlock, tagsFilter map[string]TagTest) <-chan elements.ExtendedBlock {
     
     res := make(chan elements.ExtendedBlock)
@@ -158,6 +165,18 @@ func relType(e elements.Element) string {
     return ""
 }
 
+
+// HandleRelations generates multipolygon geometries from the
+// boundary=administrative and mulitpolygon relations present in the input
+// chan inc. The way members specified in a relation are merged together
+// to form complete rings. If one valid ring is found then a Polygon
+// geometry is produced, otherwise a Multipolyon. Any tags present in both
+// the relation and the way geometries forming the outer rings are removed
+// from the Linestring / Polygons. If no tags are left the objects are
+// dropped. If the these objects still have tags, and are still features,
+// then they are added to the output channel along with the objects forming
+// the inner rings. This behaviour should be similar to the osm2pgsql
+// application.
 func HandleRelations(inc <-chan elements.ExtendedBlock, tagsFilter map[string]TagTest) <-chan elements.ExtendedBlock {
     
     res := make(chan elements.ExtendedBlock)

@@ -241,13 +241,22 @@ func GenerateGeometries(
     var D2 <-chan elements.ExtendedBlock
     if _,ok := tagsFilter["bus_routes"]; ok {
         
-        D2 = AddRelationRange(D, hasTags(map[string]string{"type":"route","route":"bus"}),"ref", BusRouteList)
+        D2 = AddRelationRange(D, hasTags(map[string]string{"type":"route","route":"bus"}),"ref", RouteList("bus_routes").Proc)
     } else {
         println("skip bus_routes")
         D2=D
     }
     
-    E := MakeGeometries(D2, tagsFilter)
+    var D3 <-chan elements.ExtendedBlock
+    if _,ok := tagsFilter["cycle_routes"]; ok {
+        
+        D3 = AddRelationRange(D2, hasTags(map[string]string{"type":"route","route":"bicycle"}),"network", RouteList("cycle_routes").Proc)
+    } else {
+        println("skip cycle_routes")
+        D3=D
+    }
+    
+    E := MakeGeometries(D3, tagsFilter)
     
     hasArea:=false
     for _,t:=range tagsFilter {
