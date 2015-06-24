@@ -16,14 +16,16 @@ import (
 )
 
 type TagTest struct {
-	IsWay  bool
-	IsNode bool
-	IsPoly string
-	Tag    string
-	Type   string
-    IsFeature bool
+	IsWay  bool // keep tag if way
+	IsNode bool // keep tag if 
+	IsPoly string // yes, no, maybe
+	Tag    string // tag key
+	Type   string // text for normal tags, calc_?? for function
+    IsFeature bool // true if enough to make an object: e.g. highway would be true, name would be false
 }
 
+// ReadStyleFile reads a json file conisting of a list of TagTest objects,
+// returning a map[string]TagTest.
 func ReadStyleFile(fn string) (map[string]TagTest,error) {
     fl,err := os.Open(fn)
     if err!=nil { return nil,err }
@@ -43,15 +45,17 @@ func ReadStyleFile(fn string) (map[string]TagTest,error) {
 
 
     
-
+// TagsEditable extends elements.Tag to allow looking up, adding and deleting
+// tag objects. It is expected that the Tags member of Geometry objects
+// will also satisify this interface.
 type TagsEditable interface {
     elements.Tags
-    Has(string) bool
-    Get(string) string
-    Put(string,string)
-    Delete(string)
-    Add(elements.Tags)
-    Clip()
+    Has(string) bool //Return true if tag is present
+    Get(string) string // Return tag value for given key
+    Put(string,string) // Insert tag with given key, value
+    Delete(string) // Remove tag with given key
+    Add(tags elements.Tags) // Updates values for tags already present
+    Clip() // Delete all
 }
 
 type tagsMap struct {
@@ -149,13 +153,16 @@ func (tm *tagsMap) Clip() {
 }
         
 
-func MakeTagsEditable(tt elements.Tags) TagsEditable {
+// MakeTagsEditable converts the given tags into a TagsEditable. The default
+// implementations is a map[string]string, with a slice giving the tag
+// order (which is given by sort.Strings)
+func MakeTagsEditable(tags elements.Tags) TagsEditable {
     tm := &tagsMap{map[string]string{},nil}
-    if tt==nil {
+    if tags==nil {
         return tm
     }
-    for i:=0; i < tt.Len(); i++ {
-        tm.Put(tt.Key(i),tt.Value(i))
+    for i:=0; i < tags.Len(); i++ {
+        tm.Put(tags.Key(i),tags.Value(i))
     }
     return tm
 }

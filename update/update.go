@@ -399,6 +399,7 @@ func CalcUpdateTiles(prfx string, xmlfn string, enddate elements.Timestamp, newf
 
 	nqts := objQtMap{}
 	qss := 0
+    numMissing := 0
 	for i := 0; i < changeobjs.Len(); i++ {
 		o := changeobjs.get(i)
 		if o.ChangeType() != elements.Delete && o.Type() == elements.Way {
@@ -413,15 +414,23 @@ func CalcUpdateTiles(prfx string, xmlfn string, enddate elements.Timestamp, newf
 				n, ok := nodelocs[wn.Ref(k)]
 
 				if !ok {
-					println("missing node", wn.Ref(k), "from", o.String(), "@", k)
-					panic("")
-                    continue
+					fmt.Printf("[%02d] missing node %10d from %s @ %d\n", numMissing, wn.Ref(k), o.String(), k)
+					numMissing++
+                    if numMissing >= 100 {
+                        panic("too many missing nodes")
+                    }
+                    
 				}
 				
                 bx.ExpandXY(n.lon,n.lat)
 			}
 			q,_ := quadtree.Calculate(*bx, 0.05, 18)
-			
+			if q<0 {
+                fmt.Printf("?? way %s has null quadtree %s\n", o.String(), *bx)
+                q=0
+            }
+            
+            
             objQts[packId(o)] = q
 			qss += 1
 			for k := 0; k < wn.Len(); k++ {

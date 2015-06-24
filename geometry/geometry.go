@@ -225,7 +225,7 @@ func GenerateGeometries(
     var C <-chan elements.ExtendedBlock
     
     if _,ok := tagsFilter["parent_highway"]; ok {
-        C = AddNodeParent(B,"highway","highway","parent_highway")
+        C = AddNodeParent(B,FindParentHighway,"highway","highway","parent_highway")
     } else {
         println("skip parent_highway")
         C=B

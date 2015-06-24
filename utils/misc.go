@@ -36,23 +36,27 @@ func WriteMemoryProfile() error {
     return nil
 }    
 
-
-func MemstatsStr() string {
-	p := os.Getpid()
+func Memstats() (float64,float64,error) {
+    p := os.Getpid()
 	statm, e := os.Open(fmt.Sprintf("/proc/%d/statm", p))
 	defer statm.Close()
 	if e != nil {
-		return e.Error()
+		return 0,0,e
 	}
 	statms, _ := ioutil.ReadAll(statm)
 	statmss := strings.Fields(string(statms))
 	if len(statmss) < 2 {
-		return string(statms)
+		return 0,0,errors.New(string(statms))
 	}
 	m0, _ := strconv.ParseFloat(statmss[0], 64)
 	m1, _ := strconv.ParseFloat(statmss[1], 64)
+    return m0*4.0/1024.0, m1*4.0/1024.0,nil
+}
 
-	return fmt.Sprintf("%8.1fmb // %8.1fmb", m0*4.0/1024.0, m1*4.0/1024.0)
+func MemstatsStr() string {
+    m0,m1,err := Memstats()
+    if err!=nil { return err.Error()}
+	return fmt.Sprintf("%8.1fmb // %8.1fmb", m0,m1)
 }
 
 func GetFileSize(fn string) (int64, error) {

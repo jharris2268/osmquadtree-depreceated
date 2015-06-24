@@ -82,19 +82,19 @@ func MakeAllocBlockStore(ty string) AllocBlockStore {
     
     switch ty {
         case "block": return newMapAllocBlockStore(makeNewSliceBlockStore,nil)
-        case "tempfile":
-            bsw := newBlockStoreWriterIdx(false, 64*1024)
-            return newMapAllocBlockStore(bsw.MakeNew, bsw.Finish)
-        case "tempfilesplit":
-            bsw := newBlockStoreWriterSplit(100, 1*1024*1024)
-            abs := newMapAllocBlockStoreSplit(bsw.MakeNew,500,bsw.Finish)
+        case "tempfile", "tempfilesort":
+            bsw := newBlockStoreWriterIdx(false, 64*1024, ty=="tempfilesort")
+            //return newMapAllocBlockStore(bsw.MakeNew, bsw.Finish)
+            return newMapAllocBlockStoreSplit(bsw.MakeNew,1,bsw.Finish)
+        case "tempfilesplit", "tempfilesplitsort":
+            bsw := newBlockStoreWriterSplit(100, 1*1024*1024, ty=="tempfilesplitsort")
+            abs := newMapAllocBlockStoreSplit(bsw.MakeNew,500,bsw.Finish, )
             return abs
             //return &groupAllocBlockStore{abs}
-        case "tempfileslim":
-            bsw := newBlockStoreWriterSplit(500,64*1024)
+        case "tempfileslim", "tempfileslimsort":
+            bsw := newBlockStoreWriterSplit(500,64*1024,ty=="tempfileslimsort")
             abs := newMapAllocBlockStoreSplit(bsw.MakeNew,1,bsw.Finish)
             return abs
-            //return &groupAllocBlockStore{abs}
     }
     panic("incorrect ty "+ty)
     return nil

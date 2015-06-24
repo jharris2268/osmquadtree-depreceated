@@ -14,6 +14,9 @@ import (
 	"os"
 	"sort"
 	"sync"
+    
+    "time"
+    "runtime/debug"
 )
 
 //sliceBlockStore: implments BlockStore
@@ -41,15 +44,36 @@ func makeNewSliceBlockStore(int) BlockStore {
 	return &sliceBlockStore{make([]IdPacked, 0, 10000)}
 }
 
+
+
+
+//blockStoreWriter
+
+type blockStoreWriter interface {
+	WriteBlock(keyPackable)
+	GetBlocks(key int) <-chan []byte
+
+	MakeNew(key int) BlockStore
+	Finish()
+}
+/*
+type blockStoreWriterSortable interface {
+    Sort()
+}*/
+
+
 //mapAllocBlockStore: implements AllocBlockStore
 
 type mapAllocBlockStore struct {
 	blocks  map[int]BlockStore
 	makeNew func(int) BlockStore //used to create new entries for blocks
+    //bsw     blockStoreWriter // stores 
+    
 	tl      int  //number of objects added
 	sp      int  //group allocs together
 	finish  func() //to clean up BlockStore entries
     issplit bool
+    
 }
 
 func newMapAllocBlockStore(makeNew func(int) BlockStore, finish func()) AllocBlockStore {
@@ -106,6 +130,7 @@ func (mabs *mapAllocBlockStore) Iter() <-chan BlockStoreAllocPair {
 		close(res)
 	}()
     if mabs.issplit {
+        
         return sortMapAllocBlockStoreResult(res)
     }
     
@@ -235,15 +260,7 @@ func (kpp *keyPendingPair) Key() int     { return kpp.key }
 func (kpp *keyPendingPair) Pack() []byte { return packObjs(kpp.key, kpp.pending) }
 
 
-//blockStoreWriter
 
-type blockStoreWriter interface {
-	WriteBlock(keyPackable)
-	GetBlocks(key int) <-chan []byte
-
-	MakeNew(key int) BlockStore
-	Finish()
-}
 
 
 
@@ -285,7 +302,14 @@ func (bsf *blockStoreFile) Flush() {
 }
 
 func (bsf *blockStoreFile) All() IdPackedList {
-
+    
+    /*
+    ss,ok := bsf.writer.(blockStoreWriterSortable)
+    if ok {
+        ss.Sort()
+    }*/
+    
+    
 	blcks := bsf.writer.GetBlocks(bsf.key)
     
     // create sliceIdPackedList to store all objects
@@ -323,9 +347,11 @@ type blockStoreWriterIdx struct {
 
 	idx    map[int][]int64 // map of key to slice of file locations
 	target int
+    
+    readlock      sync.Mutex
 }
 
-func newBlockStoreWriterIdx(split bool, lm int) blockStoreWriter {
+func newBlockStoreWriterIdx(split bool, lm int, tosort bool) blockStoreWriter {
 	bsi := blockStoreWriterIdx{}
 	var err error
 	tempdir := os.Getenv("GOPATH")
@@ -369,6 +395,12 @@ func newBlockStoreWriterIdx(split bool, lm int) blockStoreWriter {
 		}
 
 		bsi.fl.Sync()
+        
+        if tosort {
+            bsi.Sort()
+        }
+        
+        
 		bsi.fllock.Done() // finished writing, can now allow reading / closing
 	}()
 
@@ -376,6 +408,7 @@ func newBlockStoreWriterIdx(split bool, lm int) blockStoreWriter {
 	bsi.blockClosed = false
 
 	bsi.target = lm
+    
 	return &bsi
 }
 
@@ -391,31 +424,43 @@ type keyDataPair struct {
 	data []byte
 }
 
+type keyDataPairSlice []keyDataPair
+func (k keyDataPairSlice) Len() int { return len(k) }
+func (k keyDataPairSlice) Swap(i,j int) { k[i],k[j] = k[j],k[i] }
+func (k keyDataPairSlice) Less(i,j int) bool { return k[i].key < k[j].key }
+
 func (bsi *blockStoreWriterIdx) GetBlocks(key int) <-chan []byte {
     // called by blockStoreFile.All
     
+    bsi.readlock.Lock()
+    
 	if !bsi.blockClosed {
+        
         // we won't be writing any more data
 		close(bsi.blockChan)
 		bsi.blockClosed = true
 	}
+    bsi.readlock.Unlock()
 	bsi.fllock.Wait() // wait untill all data has been writen to disk
-
+    
+    
 	idx, ok := bsi.idx[key] // fetch locations for given key
-	if !ok {
-		return nil
-	}
+    
+    //fmt.Println("key=", key, "ok=",ok, "len(idx)=",len(idx))
+    
+	
 
 	out := make(chan []byte)
 	go func() {
 	
 		tl := 0
-	
-		for bl := range pbffile.ReadPbfFileBlocksMultiPartial(bsi.fl, 4, idx) {
-			b := bl.BlockData()
-			out <- b
-			tl += len(b)
-		}
+        if ok {
+            for bl := range pbffile.ReadPbfFileBlocksMultiPartial(bsi.fl, 4, idx) {
+                b := bl.BlockData()
+                out <- b
+                tl += len(b)
+            }
+        }
 	
 		close(out)
 	}()
@@ -437,16 +482,113 @@ func (bsi *blockStoreWriterIdx) Finish() {
 	}
 }
 
+
+type kpt struct {
+    key int
+    pos int64
+    ln  int64
+}
+type kpts []kpt
+func (k kpts) Len() int { return len(k) }
+func (k kpts) Swap(i,j int) { k[i],k[j]=k[j],k[i] }
+func (k kpts) Less(i,j int) bool { return k[i].pos < k[j].pos }
+
+
+
+func sortBlockSortWriterIdx(orig *blockStoreWriterIdx, newfl *os.File, newidx map[int][]int64) int64 {
+    /*
+    if !orig.blockClosed {
+        // we won't be writing any more data
+		close(orig.blockChan)
+		orig.blockClosed = true
+	}
+	orig.fllock.Wait() // wait untill all data has been writen to disk
+    */
+    tln:=int64(0)
+    nb := 0
+    
+    for _,vv:=range orig.idx {
+        nb+=len(vv)
+    }
+    kk := make(kpts, 0, nb)
+    for k,vv:=range orig.idx {
+        for _,v:=range vv {
+            kk=append(kk,kpt{k,v,-1})
+        }
+    }
+    sort.Sort(kk)
+    for i,k:=range kk {
+        d:=int64(0)
+        if i==(len(kk)-1) {
+            d,_ = orig.fl.Seek(0,2)
+        } else {
+            d = kk[i+1].pos
+        }
+        kk[i].ln = d-k.pos
+        tln += kk[i].ln
+        //println(i,kk[i].key, kk[i].pos, kk[i].ln)
+    }
+    
+    
+    allBlocks := make(keyDataPairSlice, 0, len(kk))
+    for _,k:=range kk {
+        
+        //v,_:=pbffile.ReadFileBlockAt(newfl, k.l)
+        orig.fl.Seek(k.pos,0)
+        
+        data,_ := utils.ReadBlock(orig.fl, uint64(k.ln))
+        
+        allBlocks=append(allBlocks, keyDataPair{k.key,data})
+    }
+    sort.Sort(allBlocks)
+        
+    for _,kdp := range allBlocks {
+        fp, _ := pbffile.WriteFileBlockAtEnd(newfl, kdp.data) // file location
+		newidx[kdp.key] = append(newidx[kdp.key], fp) // add to slice for given key
+    }
+    newfl.Sync()
+    return tln
+}
+
+func (bsi *blockStoreWriterIdx) Sort() {
+    st:=time.Now()
+    fmt.Printf("CALLED blockStoreWriterIdx::Sort()")
+    
+	tempdir := os.Getenv("GOPATH")
+	fl, err := ioutil.TempFile(tempdir, "osmquadtree.blocksort.tmp")
+	if err != nil {
+		panic(err.Error())
+	}
+    idx := map[int][]int64{}
+    ln := sortBlockSortWriterIdx(bsi, fl,idx)
+    
+    bsi.fl.Close()
+	os.Remove(bsi.fl.Name())
+    
+    bsi.fl,bsi.idx=fl,idx
+    debug.FreeOSMemory()
+    fmt.Printf(" wrote %8.1fmb in %8.1fs\n", float64(ln)/1024./1024, time.Since(st).Seconds())
+    
+}
+
 //blockStoreWriterSplit: writes to several temporary files
 
 type blockStoreWriterSplit struct {
 	writers map[int]blockStoreWriter 
 	splitat int 
 	lm      int //newBlockStoreWriterIdx block size
+    tosort  bool
+    
+    
 }
 
 func (bsws *blockStoreWriterSplit) WriteBlock(kp keyPackable) {
 	wk := kp.Key() / bsws.splitat
+    if bsws.splitat==0{
+        bsws.writers[0].WriteBlock(kp)
+        return
+    }
+    
 	ww, ok := bsws.writers[wk]
 	if !ok {
 		panic("trying to write to uninited blockStoreWriter")
@@ -456,6 +598,10 @@ func (bsws *blockStoreWriterSplit) WriteBlock(kp keyPackable) {
 }
 
 func (bsws *blockStoreWriterSplit) GetBlocks(key int) <-chan []byte {
+    if bsws.splitat==0{
+        return bsws.writers[0].GetBlocks(key)
+    }
+    
 	wk := key / bsws.splitat
 	ww, ok := bsws.writers[wk]
 	if !ok {
@@ -465,10 +611,17 @@ func (bsws *blockStoreWriterSplit) GetBlocks(key int) <-chan []byte {
 }
 
 func (bsws *blockStoreWriterSplit) MakeNew(key int) BlockStore {
+    if bsws.splitat==0{
+        if _,ok:= bsws.writers[0]; !ok {
+            bsws.writers[0] = newBlockStoreWriterIdx(true, bsws.lm, bsws.tosort)
+        }
+        return bsws.writers[0].MakeNew(key)
+    }
+    
 	wk := key / bsws.splitat
 	ww, ok := bsws.writers[wk]
 	if !ok {
-		bsws.writers[wk] = newBlockStoreWriterIdx(true, bsws.lm)
+		bsws.writers[wk] = newBlockStoreWriterIdx(true, bsws.lm, bsws.tosort)
 		ww = bsws.writers[wk]
 	}
 	return ww.MakeNew(key)
@@ -479,12 +632,40 @@ func (bsws *blockStoreWriterSplit) Finish() {
 		v.Finish()
 	}
 }
-func newBlockStoreWriterSplit(sp int, lm int) blockStoreWriter {
-	return &blockStoreWriterSplit{map[int]blockStoreWriter{}, sp, lm}
+func newBlockStoreWriterSplit(sp int, lm int, tosort bool) blockStoreWriter {
+	return &blockStoreWriterSplit{map[int]blockStoreWriter{}, sp, lm, tosort}
 }
-
-
-
+/*
+func (bsws *blockStoreWriterSplit) Sort() {
+    if bsws.splitat==0 { return; }
+    
+    newbsi := blockStoreWriterIdx{}
+    var err error
+	tempdir := os.Getenv("GOPATH")
+	newbsi.fl, err = ioutil.TempFile(tempdir, "osmquadtree.blocksort.tmp")
+	if err != nil {
+		panic(err.Error())
+	}
+    
+    kk :=make(sort.IntSlice, 0,len(bsws.writers))
+    for k,_:=range bsws.writers {
+        kk=append(kk,k)
+    }
+    kk.Sort()
+    
+    for _,k:=range kk {
+        ww,ok:=bsws.writers[k].(*blockStoreWriterIdx)
+        if !ok { panic("??") }
+        sortBlockSortWriterIdx(ww, newbsi.fl,newbsi.idx)
+        bsws.writers[k].Finish()
+    }
+    
+    bsws.writers = map[int]blockStoreWriter{0:&newbsi}
+    bsws.splitat=0    
+    
+    //return newbsi
+}
+*/
 
 /*
 //groupAllocBlockStore: implements AllocBlockStore: sorts data retrieved

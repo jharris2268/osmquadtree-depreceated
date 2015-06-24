@@ -7,16 +7,13 @@ package geometry
 
 import (
 	"github.com/jharris2268/osmquadtree/elements"
+	"github.com/jharris2268/osmquadtree/quadtree"
 	
-    "github.com/jharris2268/osmquadtree/quadtree"
-	//"osmfeats5/simpleobj"
 	"strconv"
-	"fmt"
     "strings"
-
 	"errors"
 	"math"
-	//"sort"
+	
 )
 
 var hworder map[string]int64
@@ -68,14 +65,12 @@ func find_zorder(tt elements.Tags) (int64,error) {
 	zo := int64(0)
 	l := int64(0)
 	haszo := ""
-	//kk,vv:=make([][]byte,0,tt.Len()+2),make([][]byte,0,tt.Len()+2)
+	
 	for i := 0; i < tt.Len(); i++ {
 		k := tt.Key(i)
 		v := tt.Value(i)
 		if k == "z_order" {
-			//return obj,nil
 			haszo = v
-			//break
 		}
 
 		switch k {
@@ -108,8 +103,6 @@ func find_zorder(tt elements.Tags) (int64,error) {
 				l -= 1
 			}
 		}
-		//kk=append(kk,[]byte(k))
-		//vv=append(vv,[]byte(v))
 	}
 
 	var err error
@@ -126,55 +119,7 @@ func find_zorder(tt elements.Tags) (int64,error) {
     return zo,nil
 }
 
-/*
-    
-	g := obj.Data()
-	gp, ok := g.(*polygonGeom)
-	if ok {
-		gp.zorder = zo
-		gp.area, err = calcWayArea(obj.Data().(SimpleObjGeometry))
-		if err != nil {
-			return nil, errors.New("prob with calc poly area " + err.Error())
-		}
-		return osmread.MakeSimpleObj(
-			obj.ObjectType(), obj.ObjectId(), obj.Info(),
-			obj.Tags(), gp, obj.Quadtree(), obj.ChangeType()), nil
-	}
-	lg, ok := g.(*linestringGeom)
-	if ok {
-		lg.zorder = zo
-		return osmread.MakeSimpleObj(
-			obj.ObjectType(), obj.ObjectId(), obj.Info(),
-			obj.Tags(), lg, obj.Quadtree(), obj.ChangeType()), nil
-	}
-	mg, ok := g.(*multiGeom)
-	if ok {
-		mg.zorder = zo
-		for i, gg := range mg.geoms {
-			switch gg.(type) {
-			case *polygonGeom:
-				gp := gg.(*polygonGeom)
-				gp.zorder = zo
-				gp.area, err = calcWayArea(gp)
-				if err != nil {
-					return obj, errors.New("prob with calc poly area " + err.Error())
-				}
-				mg.geoms[i] = gp
-			case *linestringGeom:
-				lg := gg.(*linestringGeom)
-				lg.zorder = zo
-				mg.geoms[i] = lg
-			}
-		}
 
-		return osmread.MakeSimpleObj(
-			obj.ObjectType(), obj.ObjectId(), obj.Info(),
-			obj.Tags(), mg, obj.Quadtree(), obj.ChangeType()), nil
-	}
-
-	return nil, errors.New("object not a polygonGeom or a lineGeom")
-}
-*/
 
 func same_point(a, b Coord) bool {
 	if a.Lon() != b.Lon() {
@@ -281,32 +226,6 @@ func ring_contains(outer, inner []Coord) bool {
 	return false
 }
 
-
-/*
-func calcWayArea(data SimpleObjGeometry) (float64, error) {
-	poly, ok := data.(*polygonGeom)
-	if !ok {
-		return 0.0, errors.New("not a polygonGeom")
-	}
-	polyArea := 0.0
-	for i, p := range poly.rings {
-		a := 1.0
-		if i > 0 {
-			a = -1.0
-		}
-		poly.rings[i] = dropRepeats(p)
-		if len(poly.rings[i]) < 4 {
-			return 0, errors.New("Not enough points in ring")
-		}
-		pa, is_ccw := calculate_ring_area(p)
-		if is_ccw != (i != 0) {
-			reverseRing(poly.rings[i])
-		}
-		polyArea += pa * a
-	}
-	return polyArea, nil
-}*/
-
 func lines_intersect(p0, p1, p2, p3 Coord) bool {
 	s1_x := float64(p1.Lon() - p0.Lon())
 	s1_y := float64(p1.Lat() - p0.Lat())
@@ -324,18 +243,23 @@ func lines_intersect(p0, p1, p2, p3 Coord) bool {
 
 
 
-
-func findParentHighway(pp []string) string {
+// FindParentHighway returns the highway value from highways with the
+// highest z_order value. This behaviour should match that of osm2pgsql.
+func FindParentHighway(highways []string) string {
 	mv := ""
+    if len(highways)==0 {
+        return mv
+    }
+    
 	sc := int64(0)
 
 	if hworder == nil {
 		init_hworder()
 	}
-	if len(pp) == 1 {
-		return pp[0]
+	if len(highways) == 1 {
+		return highways[0]
 	}
-	for _, p := range pp {
+	for _, p := range highways {
 		s, ok := hworder[p]
 		if ok && (s > sc || (s == sc && strings.HasSuffix(mv, "link"))) {
 			mv = p
@@ -344,7 +268,7 @@ func findParentHighway(pp []string) string {
 	}
 	if mv == "" {
 		ppm := map[string]int{}
-		for _, p := range pp {
+		for _, p := range highways {
 			ppm[p] += 1
 		}
 		maxm := 0
@@ -353,9 +277,9 @@ func findParentHighway(pp []string) string {
 				mv = k
 			}
 		}
-		if len(ppm) > 1 {
-			fmt.Println("pick", mv, "from", ppm)
-		}
+		//if len(ppm) > 1 {
+		//	fmt.Println("pick", mv, "from", ppm)
+		//}
 	}
 	return mv
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/jharris2268/osmquadtree/quadtree"
 	"time"
     "strings"
+    "fmt"
 )
 
 // ElementType shows which type of openstreetmap entity is represented by
@@ -75,6 +76,15 @@ func (ct ChangeType) String() string {
 }
 
 type Ref int64
+
+func (r Ref) String() string {
+    if r>0xffffffffffff {
+        t := r<<61
+        return fmt.Sprintf("%d %8d", t, r&0xffffffffffff)
+    }
+    return fmt.Sprintf("%10d", r)
+}
+
 type Timestamp int64
 
 func (t Timestamp) String() string {

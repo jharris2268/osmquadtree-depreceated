@@ -12,19 +12,32 @@ import (
     
 )
 
-func AddNodeParent(inc <-chan elements.ExtendedBlock, nodetag, waytag, parenttag string) <-chan elements.ExtendedBlock {
+// AddNodeParent adds tags to nodes (filtered by having a tag with key
+// nodetag) within input chan inc to show the value of the parent way
+// tag waytag. The new tag has the key parenttag. As one node can have
+// several parent values, the proccessParentValue is called to find the
+// correct value. Ways, relations and unaffected nodes are immeadiatly
+// written to the output channel. Affected nodes are grouped by quadtree
+// and written to the output channel when no more ways can be found. Note
+// that this means the output channel is not in strict quadtree block order,
+// but this will not affect the behaviour of AddRelationRange.
+// AddNodeParent can be used, for example, to add the parent way highway
+// type for nodes with a highway tag. FindParentHighway should be used
+// for proccesParentValue. This can then replace the geospatial join for
+// rendering turning circles.
+func AddNodeParent(inc <-chan elements.ExtendedBlock, processParentValue func([]string) string, nodetag, waytag, parenttag string) <-chan elements.ExtendedBlock {
     
     res := make(chan elements.ExtendedBlock)
     
     go func() {
         
         nodes := map[quadtree.Quadtree][]elements.FullNode{}
-        ss := map[elements.Ref][]string{}
+        ss := map[elements.Ref][]string{} //nodes waiting parent values
         idx:=0
         for bl := range inc {
             nn := make([]elements.FullNode,0,25)
             bq:=bl.Quadtree()
-            nb := make(elements.ByElementId,0,bl.Len())
+            nb := make(elements.ByElementId,0,bl.Len()) // block to pass on
             for i:=0; i < bl.Len(); i++ {
                 e:=bl.Element(i)
                 switch e.Type() {
@@ -38,7 +51,7 @@ func AddNodeParent(inc <-chan elements.ExtendedBlock, nodetag, waytag, parenttag
                             nn=append(nn,fn)
                             ss[fn.Id()] = make([]string,0,5)
                         } else {
-                            nb = append(nb, e)
+                            nb = append(nb, e) //pass on
                         }
                 
                     case elements.Way:
@@ -52,7 +65,7 @@ func AddNodeParent(inc <-chan elements.ExtendedBlock, nodetag, waytag, parenttag
                             for i:=0; i < fw.Len(); i++ {
                                 n := fw.Ref(i)
                                 if _,ok:=ss[n]; ok {
-                                    
+                                    //add to pending map
                                     ss[n]=append(ss[n],h)
                                 }
                             }
@@ -69,10 +82,12 @@ func AddNodeParent(inc <-chan elements.ExtendedBlock, nodetag, waytag, parenttag
             ds:=make([]quadtree.Quadtree,0,len(nodes))
             for k,v := range nodes {
                 if k.Common(bq) != k {
-                    
+                    // we won't find any more parent ways, so we can
+                    // add the new tags and send the nodes block to the
+                    // output channel
                     r:=make(elements.ByElementId,len(v))
                     for i,n := range v {
-                        hw := findParentHighway(ss[n.Id()])
+                        hw := processParentValue(ss[n.Id()])
                         if hw!="" {
                             n.Tags().(TagsEditable).Put(parenttag,hw)
                         }
@@ -96,7 +111,7 @@ func AddNodeParent(inc <-chan elements.ExtendedBlock, nodetag, waytag, parenttag
         for k,v := range nodes {
             r:=make(elements.ByElementId,len(v))
             for i,n := range v {
-                hw := findParentHighway(ss[n.Id()])
+                hw := processParentValue(ss[n.Id()])
                 
                 if hw!="" {
                     n.Tags().(TagsEditable).Put(parenttag,hw)

@@ -14,6 +14,7 @@ import (
 	
 	"github.com/jharris2268/osmquadtree/elements"
     "github.com/jharris2268/osmquadtree/quadtree"
+    
 	
 )
 
@@ -96,7 +97,15 @@ const DefaultSource = string("http://planet.openstreetmap.org/replication/day/")
 
 func GetUpdateSettings(prfx string) (UpdateSettings, error) {
     fl,err := os.Open(prfx+"settings.json")
-    if err!=nil { return UpdateSettings{},err }
+    if err!=nil {
+        _,_,err2 := GetCacheSpecsLevelDb(prfx)
+        if err2 == nil {
+            return UpdateSettings{"","",0,true,"leveldb"},nil
+        } else {
+            return UpdateSettings{},err    
+        }
+    }
+
     defer fl.Close()
     us := UpdateSettings{}
     err = json.NewDecoder(fl).Decode(&us)

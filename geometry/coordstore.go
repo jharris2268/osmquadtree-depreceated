@@ -236,8 +236,9 @@ func AddWayCoords(inc <- chan elements.ExtendedBlock, bx *quadtree.Bbox) <-chan 
                         
                         
                         if err!=nil {
-                            fmt.Println(bl,fw)
-                            panic(err.Error())
+                            fmt.Println(bl,fw,err.Error())
+                            //panic(err.Error())
+                            continue
                         }
                         // skip if entirely outside of bounding box
                         if bx!=nil && !bx.Intersects(*wbx) {

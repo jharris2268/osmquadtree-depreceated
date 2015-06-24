@@ -92,6 +92,10 @@ func reverseCoords(cc []Coord) {
     }
 }
 
+// PartialLinestringGeometry creates as new LinestringGeometry with the
+// same tags, info and other metadata as the input geometry ls, but with
+// the nodes trimmed to be between index fr and to. If fr is less than
+// to, the line is reversed.
 func PartialLinestringGeometry(ls LinestringGeometry, fr int, to int) LinestringGeometry {
     var coords []Coord
     

@@ -16,6 +16,8 @@ import (
 	//"reflect"
 
 	"github.com/jharris2268/osmquadtree/utils"
+    
+    "runtime"
 )
 
 type fileBlock struct {
@@ -168,6 +170,7 @@ func ReadPbfFileBlocksMulti(file *os.File, nc int) <-chan FileBlock {
 	resA := make(chan *fileBlock)
 	i := 0
 	go func() {
+        
 		defer file.Close()
 		for {
 			bl, err := readNextBlock(file, i)
@@ -474,6 +477,8 @@ func ReadPbfFileBlocksDefer(file io.ReadSeeker) <-chan FileBlock {
 	resA := make(chan FileBlock)
 	i := 0
 	go func() {
+        runtime.LockOSThread()
+        defer runtime.UnlockOSThread()
 		fc,ok := file.(io.ReadCloser)
         if ok {
             defer fc.Close()
@@ -524,6 +529,8 @@ func ReadPbfFileBlocksDeferPartial(file io.ReadSeeker, locs []int64) <-chan File
 	resA := make(chan FileBlock)
 	//i := 0
 	go func() {
+        runtime.LockOSThread()
+        defer runtime.UnlockOSThread()
 		fc,ok := file.(io.ReadCloser)
         if ok {
             defer fc.Close()
@@ -561,6 +568,8 @@ func ReadPbfFileBlocksDeferSplitPartial(file io.ReadSeeker, locs []int64, ns int
     }
 	//i := 0
 	go func() {
+        runtime.LockOSThread()
+        defer runtime.UnlockOSThread()
 		fc,ok := file.(io.ReadCloser)
         if ok {
             defer fc.Close()
@@ -627,6 +636,8 @@ func ReadPbfFileBlocksDeferSplit(file io.ReadSeeker, ns int) []<-chan FileBlock 
     }
 	i := 0
 	go func() {
+        runtime.LockOSThread()
+        defer runtime.UnlockOSThread()
 		fc,ok := file.(io.ReadCloser)
         if ok {
             defer fc.Close()

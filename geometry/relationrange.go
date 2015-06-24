@@ -22,9 +22,12 @@ type pendingTags struct {
     s []string
 }
 
-func AdminLevels(tt TagsEditable, ss []string) bool {
-    ssi := make(utils.Int64Slice, 0, len(ss))
-    for _,s:=range ss {
+// AdminLevels adds two new tags to tags. min_admin_level will equal the
+// smallest numerical value of admin_values, max_admin_level the highest.
+// admin_values which cannot be read as integer values are ignored.
+func AdminLevels(tags TagsEditable, admin_values []string) bool {
+    ssi := make(utils.Int64Slice, 0, len(admin_values))
+    for _,s:=range admin_values {
         ii,err := strconv.ParseInt(s,10,64)
         if err==nil {
             ssi = append(ssi,ii)
@@ -37,13 +40,15 @@ func AdminLevels(tt TagsEditable, ss []string) bool {
     
     
     
-    tt.Put("min_admin_level", fmt.Sprintf("%d",ssi[0]))
-    tt.Put("max_admin_level", fmt.Sprintf("%d",ssi[len(ssi)-1]))
+    tags.Put("min_admin_level", fmt.Sprintf("%d",ssi[0]))
+    tags.Put("max_admin_level", fmt.Sprintf("%d",ssi[len(ssi)-1]))
     return true
 }
 
+// RouteList, and its member Proc, addes a new tag to the TagsEditdate tt.
+// The key is the string value of RouteList and the value the lexically
+// ordered unique values of given ss.
 type RouteList string
-
 func (rl RouteList) Proc(tt TagsEditable, ss []string) bool {
     if ss==nil || len(ss) == 0 {
         return false
@@ -64,6 +69,12 @@ func (rl RouteList) Proc(tt TagsEditable, ss []string) bool {
 }
 
 
+// AddRelationRange is used to add tags to Way elements based on parent
+// relations. For each relation, if testRel returns true the value for
+// the tag with key srctag is stored with the way member ids. For each
+// way which has at least one parent relation the proc function is called,
+// which adds the new tag to the way object. All elements are written
+// to the output channel, preserving the order.
 func AddRelationRange(inc <-chan elements.ExtendedBlock, testRel func(TagsEditable) bool, srctag string, proc func(TagsEditable,[]string) bool) <-chan elements.ExtendedBlock {
     
     res := make(chan elements.ExtendedBlock)
