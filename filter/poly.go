@@ -10,9 +10,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+
 	"github.com/jharris2268/osmquadtree/quadtree"
 	"github.com/jharris2268/osmquadtree/utils"
-    
+
 	"strings"
 )
 
@@ -21,7 +22,7 @@ type lonLat struct {
 }
 type lonLatSlice []lonLat
 
-func (ll lonLatSlice) Len() int { return len(ll) }
+func (ll lonLatSlice) Len() int        { return len(ll) }
 func (ll lonLatSlice) Lon(i int) int64 { return ll[i].lon }
 func (ll lonLatSlice) Lat(i int) int64 { return ll[i].lat }
 
@@ -34,19 +35,18 @@ type locTestPolygon struct {
 // the specified polygon. Note that the ContainsQuadtree function tests the four corners
 // of the quadtree only.
 func MakeLocTestPolygon(lons, lats []int64) LocTest {
-    verts := make(lonLatSlice,len(lons))
-    for i,ln := range lons {
-        verts[i] = lonLat{ln,lats[i]}
-    }
-        
-    return locTestPolygon{verts, nil }
+	verts := make(lonLatSlice, len(lons))
+	for i, ln := range lons {
+		verts[i] = lonLat{ln, lats[i]}
+	}
+
+	return locTestPolygon{verts, nil}
 }
-    
 
 func (tp locTestPolygon) Bbox() quadtree.Bbox {
 	if tp.bb == nil {
 		tp.bb = &quadtree.Bbox{1800000000, 900000000, -1800000000, -900000000}
-		for i:=0; i < tp.verts.Len(); i++ {
+		for i := 0; i < tp.verts.Len(); i++ {
 			if tp.verts.Lon(i) < tp.bb.Minx {
 				tp.bb.Minx = tp.verts.Lon(i)
 			}
@@ -171,7 +171,6 @@ func (tp locTestPolygonMulti) String() string {
 	return fmt.Sprintf("locTestPolygonMulti: %d polys, %d holes %s", len(tp.polys), len(tp.holes), tp.Bbox().String())
 }
 
-
 // ReadPolyFile reads the osmosis poly file fn (see
 // http://wiki.openstreetmap.org/wiki/Osmosis/Polygon_Filter_File_Format
 // ) and constructs a LocTest which returns true if a point is within the
@@ -188,7 +187,7 @@ func ReadPolyFile(fn string) (LocTest, error) {
 	i := 0
 	inply, label := false, ""
 	curr := locTestPolygon{}
-    currverts:=lonLatSlice{}
+	currverts := lonLatSlice{}
 	res := locTestPolygonMulti{}
 	for scan.Scan() {
 		ln := strings.TrimSpace(scan.Text())
@@ -200,14 +199,14 @@ func ReadPolyFile(fn string) (LocTest, error) {
 		} else if inply {
 			if ln == "END" {
 				inply = false
-                curr.verts=currverts
+				curr.verts = currverts
 				if strings.HasPrefix(label, "!") {
 					res.holes = append(res.holes, curr)
 				} else {
 					res.polys = append(res.polys, curr)
 				}
 				curr = locTestPolygon{}
-                currverts=lonLatSlice{}
+				currverts = lonLatSlice{}
 			} else {
 				xy := strings.Fields(ln)
 				if len(xy) != 2 {
@@ -239,5 +238,5 @@ func ReadPolyFile(fn string) (LocTest, error) {
 		return res.polys[0], nil
 	}
 	return res, nil
-	
+
 }

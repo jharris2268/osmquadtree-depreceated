@@ -11,52 +11,55 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
+	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
-    "sort"
-    "path/filepath"
-    
-    "runtime"
-    "runtime/pprof"
-    "os/signal"
-    "syscall"
+
+	"os/signal"
+	"runtime"
+	"runtime/pprof"
+	"syscall"
 )
 
 func WriteMemoryProfile() error {
-    tempdir:=os.Getenv("GOPATH")
-    f,err := ioutil.TempFile(tempdir, "osmquadtree.utils.memprofile")
-    if err != nil {
-        return err
-    }
-    pprof.WriteHeapProfile(f)
-    p,_:=f.Seek(0,2)
-    f.Close()
-    fmt.Printf("Memprofile: %d bytes to %s [%s]\n", p, f.Name(),MemstatsStr())
-    return nil
-}    
+	tempdir := os.Getenv("GOPATH")
+	f, err := ioutil.TempFile(tempdir, "osmquadtree.utils.memprofile")
+	if err != nil {
+		return err
+	}
+	pprof.WriteHeapProfile(f)
+	p, _ := f.Seek(0, 2)
+	f.Close()
+	log.Printf("Memprofile: %d bytes to %s [%s]\n", p, f.Name(), MemstatsStr())
+	return nil
+}
 
-func Memstats() (float64,float64,error) {
-    p := os.Getpid()
+func Memstats() (float64, float64, error) {
+	p := os.Getpid()
 	statm, e := os.Open(fmt.Sprintf("/proc/%d/statm", p))
 	defer statm.Close()
 	if e != nil {
-		return 0,0,e
+		return 0, 0, e
 	}
 	statms, _ := ioutil.ReadAll(statm)
 	statmss := strings.Fields(string(statms))
 	if len(statmss) < 2 {
-		return 0,0,errors.New(string(statms))
+		return 0, 0, errors.New(string(statms))
 	}
 	m0, _ := strconv.ParseFloat(statmss[0], 64)
 	m1, _ := strconv.ParseFloat(statmss[1], 64)
-    return m0*4.0/1024.0, m1*4.0/1024.0,nil
+	return m0 * 4.0 / 1024.0, m1 * 4.0 / 1024.0, nil
 }
 
 func MemstatsStr() string {
-    m0,m1,err := Memstats()
-    if err!=nil { return err.Error()}
-	return fmt.Sprintf("%8.1fmb // %8.1fmb", m0,m1)
+	m0, m1, err := Memstats()
+	if err != nil {
+		return err.Error()
+	}
+	return fmt.Sprintf("%8.1fmb // %8.1fmb", m0, m1)
 }
 
 func GetFileSize(fn string) (int64, error) {
@@ -87,14 +90,14 @@ func FileExists(fn string) (bool, error) {
 }
 
 func GetFileNamesWithExtension(dir string, ext string) ([]string, error) {
-    
-    ok,err := FileExists(dir)
-    if !ok {
-        return nil, errors.New("No such file")
-    }
-    
+
+	ok, err := FileExists(dir)
+	if !ok {
+		return nil, errors.New("No such file")
+	}
+
 	if strings.HasSuffix(dir, ext) {
-        return []string{dir}, nil
+		return []string{dir}, nil
 	}
 
 	dc, err := ioutil.ReadDir(dir)
@@ -103,32 +106,32 @@ func GetFileNamesWithExtension(dir string, ext string) ([]string, error) {
 	}
 	fn := make([]string, 0, len(dc))
 	for _, f := range dc {
-		
+
 		if strings.HasSuffix(f.Name(), ext) {
-			fn = append(fn, filepath.Join(dir,f.Name()))
+			fn = append(fn, filepath.Join(dir, f.Name()))
 		}
 	}
 	sort.Sort(sort.StringSlice(fn))
 	if len(fn) == 0 {
-		return nil, errors.New("no " + ext +" files in directory")
+		return nil, errors.New("no " + ext + " files in directory")
 	}
 	return fn, nil
 }
 
 func OnTerm() {
-    c := make(chan os.Signal, 1)
-    signal.Notify(c, os.Interrupt)
-    signal.Notify(c, syscall.SIGTERM)
-    go func() {
-        z:=<-c
-        fmt.Println("TERM", z)
-        
-        buf := make([]byte, 1<<16)
-        sl:=runtime.Stack(buf, true)
-        fmt.Println(string(buf[:sl]))
-        
-        WriteMemoryProfile()
-        
-        os.Exit(1)
-    }()
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	signal.Notify(c, syscall.SIGTERM)
+	go func() {
+		z := <-c
+		log.Println("TERM", z)
+
+		buf := make([]byte, 1<<16)
+		sl := runtime.Stack(buf, true)
+		log.Println(string(buf[:sl]))
+
+		WriteMemoryProfile()
+
+		os.Exit(1)
+	}()
 }

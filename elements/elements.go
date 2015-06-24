@@ -8,14 +8,15 @@
 package elements
 
 import (
-	"github.com/jharris2268/osmquadtree/quadtree"
+	"fmt"
+	"strings"
 	"time"
-    "strings"
-    "fmt"
+
+	"github.com/jharris2268/osmquadtree/quadtree"
 )
 
 // ElementType shows which type of openstreetmap entity is represented by
-// an Element. An element of type Geometry is a node, way or relation 
+// an Element. An element of type Geometry is a node, way or relation
 // which has been converted to a WKT style Point, Linestring or Polygon
 type ElementType int
 
@@ -45,13 +46,12 @@ func (et ElementType) String() string {
 type ChangeType int
 
 const (
-    
-	Normal ChangeType = iota //An object not part of a change block
-	Delete //An object to delete from the source block
-	Remove //An object to remove from the source block and place in another block
-	Unchanged //An object which has been moved from another source block
-	Modify //An updated, existing object
-	Create //A new object
+	Normal    ChangeType = iota //An object not part of a change block
+	Delete                      //An object to delete from the source block
+	Remove                      //An object to remove from the source block and place in another block
+	Unchanged                   //An object which has been moved from another source block
+	Modify                      //An updated, existing object
+	Create                      //A new object
 )
 
 func ChangeTypeString(ct ChangeType) string {
@@ -78,11 +78,11 @@ func (ct ChangeType) String() string {
 type Ref int64
 
 func (r Ref) String() string {
-    if r>0xffffffffffff {
-        t := r<<61
-        return fmt.Sprintf("%d %8d", t, r&0xffffffffffff)
-    }
-    return fmt.Sprintf("%10d", r)
+	if r > 0xffffffffffff {
+		t := r << 61
+		return fmt.Sprintf("%d %8d", t, r&0xffffffffffff)
+	}
+	return fmt.Sprintf("%10d", r)
 }
 
 type Timestamp int64
@@ -95,10 +95,10 @@ func (t Timestamp) DateString() string {
 }
 
 func (t Timestamp) FileString(round bool) string {
-    if round {
-        return t.DateString()
-    }
-    return strings.Replace(t.String(), ":","-",-1)
+	if round {
+		return t.DateString()
+	}
+	return strings.Replace(t.String(), ":", "-", -1)
 }
 
 // ReadDateString parses s as either short date form "20060102" or full
@@ -115,34 +115,34 @@ func ReadDateString(s string) (Timestamp, error) {
 	return Timestamp(a.Unix()), nil
 }
 
-// Element is be base type for storing openstreetmap entities. 
+// Element is be base type for storing openstreetmap entities.
 type Element interface {
-	Type()          ElementType
-	Id()            Ref
-	ChangeType()    ChangeType
-    
-    // Pack() returns a []byte contiained the serialized element data.
-    // See UnpackElement to convert this back to an Element
-	Pack()          []byte
-	String()        string
+	Type() ElementType
+	Id() Ref
+	ChangeType() ChangeType
+
+	// Pack() returns a []byte contiained the serialized element data.
+	// See UnpackElement to convert this back to an Element
+	Pack() []byte
+	String() string
 }
 
 type Tags interface {
-	Len()           int
-	Key(int)        string
-	Value(int)      string
+	Len() int
+	Key(int) string
+	Value(int) string
 
-	Pack()          []byte
+	Pack() []byte
 }
 
 // Info contains the user and changeset metadata for an osm entity
 type Info interface {
-	Version()       int64
-	Timestamp()     Timestamp
-	Changeset()     Ref
-	Uid()           int64
-	User()          string
-    Visible()       bool
+	Version() int64
+	Timestamp() Timestamp
+	Changeset() Ref
+	Uid() int64
+	User() string
+	Visible() bool
 	Pack() []byte
 }
 
@@ -154,22 +154,21 @@ type LonLat interface {
 
 // Refs provide a way's node refs
 type Refs interface {
-	Len()       int
-	Ref(int)    Ref
+	Len() int
+	Ref(int) Ref
 }
 
 // Members provides a relation's members
 type Members interface {
-	Len()           int
+	Len() int
 	MemberType(int) ElementType
-	Ref(int)        Ref
-	Role(int)       string
+	Ref(int) Ref
+	Role(int) string
 }
 
 type Quadtreer interface {
-	Quadtree()      quadtree.Quadtree
+	Quadtree() quadtree.Quadtree
 }
-
 
 type FullElement interface {
 	Element
@@ -198,8 +197,8 @@ type FullRelation interface {
 
 type PackedGeometry interface {
 	FullElement
-    
-    // GeometryData returns a []byte containing the protocol buffers
-    // serialized geometry data
-	GeometryData() []byte 
+
+	// GeometryData returns a []byte containing the protocol buffers
+	// serialized geometry data
+	GeometryData() []byte
 }

@@ -6,13 +6,12 @@
 package quadtree
 
 import (
-    "math"
-    "errors"
-    "sort"
+	"errors"
+	"math"
+	"sort"
 )
 
 var WrongCharErr = errors.New("Wrong Character [not A,B,C,D]")
-
 
 //A quadtree is a tree structure in which each node has four child nodes.
 //This makes very useful for storing geodata [1].
@@ -38,12 +37,9 @@ var WrongCharErr = errors.New("Wrong Character [not A,B,C,D]")
 //[2] http://wiki.openstreetmap.org/wiki/QuadTiles
 type Quadtree int64
 
-
 const Null = Quadtree(-1)
 
 //func (q Quadtree) MarshalJSON() ([]byte, error) { return []byte(q.String()),nil }
-
-
 
 func makeQuadTreeFloat(mx, my, Mx, My float64, mxl uint, bf float64) Quadtree {
 	if mx > Mx || my > My {
@@ -116,15 +112,12 @@ func makeQuadTree_(mx, my, Mx, My float64, mxl uint, bf float64, cl uint) int64 
 	return (q << (61 - 2*cl)) + 1 + makeQuadTree_(2*mx, 2*my, 2*Mx, 2*My, mxl-1, bf, cl+1)
 }
 
-
-
-
 func (qt Quadtree) String() string {
-    if (qt<=Null) {
-        return "NULL"
-    }
-    
-    l := qt & 31
+	if qt <= Null {
+		return "NULL"
+	}
+
+	l := qt & 31
 	r := make([]byte, l)
 	for i, _ := range r {
 		v := (qt >> (61 - 2*uint(i))) & 3
@@ -144,8 +137,8 @@ func (qt Quadtree) String() string {
 }
 
 func (qt Quadtree) Bounds(buffer float64) Bbox {
-    
-    mx, my, Mx, My := -180., -90., 180., 90.
+
+	mx, my, Mx, My := -180., -90., 180., 90.
 
 	l := qt & 31
 	r := make([]byte, l)
@@ -180,13 +173,13 @@ func (qt Quadtree) Bounds(buffer float64) Bbox {
 	}
 
 	return Bbox{ToInt(mx), ToInt(my), ToInt(Mx), ToInt(My)}
-    
+
 }
 
 //Tile coordinate as (x,y,z), with y at the top (nb. tile filenames
 // usually <z>/<x>/<y>.png).
-func (qt Quadtree) Tuple() (int64,int64,int64) {
-    z := int64(qt & 31)
+func (qt Quadtree) Tuple() (int64, int64, int64) {
+	z := int64(qt & 31)
 	x := int64(0)
 	y := int64(0)
 	for i := 0; i < int(z); i++ {
@@ -205,10 +198,9 @@ func (qt Quadtree) Tuple() (int64,int64,int64) {
 	return x, y, z
 }
 
-
 //Return parent quadtree tile at given level
 func (qt Quadtree) Round(level uint) Quadtree {
-    if uint(qt&31) < level {
+	if uint(qt&31) < level {
 		return qt
 	}
 	qt >>= (63 - 2*level)
@@ -218,7 +210,7 @@ func (qt Quadtree) Round(level uint) Quadtree {
 
 //Return largest quadtree tile which is parent to both qt and other
 func (qt Quadtree) Common(other Quadtree) Quadtree {
-    if qt == -1 {
+	if qt == -1 {
 		return other
 	} else if other == -1 {
 		return qt
@@ -233,7 +225,7 @@ func (qt Quadtree) Common(other Quadtree) Quadtree {
 	p := Quadtree(0)
 
 	for i := uint(0); i < uint(d); i++ {
-		q := qt.Round(i+1)
+		q := qt.Round(i + 1)
 		if q != other.Round(i+1) {
 
 			return p
@@ -246,19 +238,19 @@ func (qt Quadtree) Common(other Quadtree) Quadtree {
 
 //Return smallest quadtree tile which contains the given Bbox.
 //If buffer > 0, allow tiles which almost contain object.
-//Only descend to makeLevel 
-func Calculate(box Bbox, buffer float64, maxLevel uint) (Quadtree,error) {
-    return makeQuadTreeFloat(
+//Only descend to makeLevel
+func Calculate(box Bbox, buffer float64, maxLevel uint) (Quadtree, error) {
+	return makeQuadTreeFloat(
 		ToFloat(box.Minx), ToFloat(box.Miny),
 		ToFloat(box.Maxx), ToFloat(box.Maxy),
 		maxLevel, buffer), nil
 }
 
 func FromTuple(x int64, y int64, z int64) (Quadtree, error) {
-    ans := int64(0)
+	ans := int64(0)
 	scale := int64(1)
 	for i := uint(0); i < uint(z); i++ {
-		ans += ((x>>i)&1|((y>>i)&1)<<1) * scale
+		ans += ((x>>i)&1 | ((y>>i)&1)<<1) * scale
 		scale *= 4
 	}
 
@@ -268,25 +260,29 @@ func FromTuple(x int64, y int64, z int64) (Quadtree, error) {
 }
 
 func FromString(str string) (Quadtree, error) {
-    
-    ans:=0
-    for i:=0; i < len(str); i++ {
-        p:=-1
-        switch str[i] {
-            case 'A': p=0
-            case 'B': p=1
-            case 'C': p=2
-            case 'D': p=3
-            default: return 0, WrongCharErr
-        }
-        ans |= p<<(61-2*uint(i))
-    }
-    ans |= len(str)
-    
-    return Quadtree(ans),nil
-    
-}
 
+	ans := 0
+	for i := 0; i < len(str); i++ {
+		p := -1
+		switch str[i] {
+		case 'A':
+			p = 0
+		case 'B':
+			p = 1
+		case 'C':
+			p = 2
+		case 'D':
+			p = 3
+		default:
+			return 0, WrongCharErr
+		}
+		ans |= p << (61 - 2*uint(i))
+	}
+	ans |= len(str)
+
+	return Quadtree(ans), nil
+
+}
 
 func merc(y float64) float64 {
 	return math.Log(math.Tan(math.Pi*(1.0+y/90.0)/4.0)) * 90.0 / math.Pi
@@ -297,7 +293,6 @@ func unMerc(d float64) float64 {
 }
 
 const earth_half_circum = 20037508.3428
-
 
 //Transform lon lat into spherical mercartor coordinate
 func Mercator(ln float64, lt float64) (float64, float64) {
@@ -310,8 +305,9 @@ func UnMercator(x, y float64) (float64, float64) {
 }
 
 type QuadtreeSlice []Quadtree
-func (qs QuadtreeSlice) Len() int { return len(qs) }
-func (qs QuadtreeSlice) Swap(i,j int) { qs[i],qs[j] = qs[j],qs[i] }
-func (qs QuadtreeSlice) Less(i,j int) bool { return qs[i] < qs[j] }
+
+func (qs QuadtreeSlice) Len() int           { return len(qs) }
+func (qs QuadtreeSlice) Swap(i, j int)      { qs[i], qs[j] = qs[j], qs[i] }
+func (qs QuadtreeSlice) Less(i, j int) bool { return qs[i] < qs[j] }
 
 func (qs QuadtreeSlice) Sort() { sort.Sort(qs) }

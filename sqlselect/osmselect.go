@@ -6,7 +6,6 @@
 package sqlselect
 
 import (
-
 	"fmt"
 	"strconv"
 )

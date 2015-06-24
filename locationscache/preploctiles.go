@@ -7,14 +7,14 @@ package locationscache
 
 import (
 	"encoding/binary"
-	"fmt"
-	
-    "runtime/debug"
+	"log"
+
+	"runtime/debug"
 	"sort"
 	"sync"
 
-	"github.com/jharris2268/osmquadtree/quadtree"
 	"github.com/jharris2268/osmquadtree/elements"
+	"github.com/jharris2268/osmquadtree/quadtree"
 	"github.com/jharris2268/osmquadtree/utils"
 )
 
@@ -87,9 +87,7 @@ func unpackTvs(cc []Kbb) *tvs {
 }
 
 func packCC(cc []int64) []byte {
-    
-    
-    
+
 	ans := make([]byte, 320)
 	p := 0
 	a := int64(0)
@@ -108,7 +106,7 @@ func makeCC(qtl map[int64]int64, tvs *tvs, out chan Kbb, blSize int64) int {
 	for i := 0; i < tvs.l; i++ {
 		if tvs.t[i].i/blSize != a {
 			if c {
-                cc,_ := utils.PackDeltaPackedList(b)
+				cc, _ := utils.PackDeltaPackedList(b)
 				out <- Kbb{a, 0, cc}
 				d++
 			}
@@ -128,7 +126,7 @@ func makeCC(qtl map[int64]int64, tvs *tvs, out chan Kbb, blSize int64) int {
 		c = true
 	}
 	if c {
-        cc,_ := utils.PackDeltaPackedList(b)
+		cc, _ := utils.PackDeltaPackedList(b)
 		out <- Kbb{a, 0, cc}
 		d++
 	}
@@ -141,14 +139,11 @@ func (tvs int64Slice) Len() int           { return len(tvs) }
 func (tvs int64Slice) Less(i, j int) bool { return tvs[i] < tvs[j] }
 func (tvs int64Slice) Swap(i, j int)      { tvs[j], tvs[i] = tvs[i], tvs[j] }
 
-
 type Kbb struct {
 	K int64
 	L int
 	B []byte
 }
-
-
 
 func IterObjectLocations(inputChans []chan elements.ExtendedBlock, blSize int64, np int) (<-chan Kbb, []int64) {
 
@@ -165,68 +160,67 @@ func IterObjectLocations(inputChans []chan elements.ExtendedBlock, blSize int64,
 		qtcwg.Done()
 	}()
 
-    
-    go func() {
+	go func() {
 
-        wg:=sync.WaitGroup{}
-        wg.Add(len(inputChans))
-        //fmt.Println("have",len(inputChans),"input chans")
-        for _,inc:=range inputChans {
-            go func(inc chan elements.ExtendedBlock) {
-        
-                vvs := map[int64]*tvs{}
-                for bl:=range inc {
-                    
-                    qt := int64(bl.Quadtree())
-                    if qt<0 {
-                        //panic("block with qt < 0??")
-                        fmt.Println(bl.Idx(),"??",bl)
-                        continue
-                    }
-                    qtc <- qt
-                    for i := 0; i < bl.Len(); i++ {
-                        o := bl.Element(i)
-                        id := int64(o.Type()) << 59
-                        id |= int64(o.Id())
+		wg := sync.WaitGroup{}
+		wg.Add(len(inputChans))
+		//log.Println("have",len(inputChans),"input chans")
+		for _, inc := range inputChans {
+			go func(inc chan elements.ExtendedBlock) {
 
-                        oi := id >> 25
-                        _, ok := vvs[oi]
-                        if !ok {
-                            vvs[oi] = &tvs{make([]tp, 128*1024), 0}
-                        }
-                        vs := vvs[oi]
-                        vs.t[vs.l].i = id
-                        vs.t[vs.l].b = qt
-                        vs.l += 1
+				vvs := map[int64]*tvs{}
+				for bl := range inc {
 
-                        if vs.l == 128*1024 {
-                            sort.Sort(vs)
-                            b := vs.pack()
-                            bp, _ := utils.Compress(b)
-                            outc <- Kbb{oi, len(b), bp}
-                            vs.l = 0
-                            b = nil
-                        }
-                        vvs[oi] = vs
-                    }
-                }
-                for oi, vs := range vvs {
-                    if vs.l > 0 {
-                        sort.Sort(vs)
-                        b := vs.pack()
-                        bp, _ := utils.Compress(b)
-                        outc <- Kbb{oi, len(b), bp}
-                    }
-                    delete(vvs, oi)
-                }
-                
-                wg.Done()
-                
-            }(inc)
-        }
-    
-        wg.Wait()
-        close(outc)
+					qt := int64(bl.Quadtree())
+					if qt < 0 {
+						//panic("block with qt < 0??")
+						log.Println(bl.Idx(), "??", bl)
+						continue
+					}
+					qtc <- qt
+					for i := 0; i < bl.Len(); i++ {
+						o := bl.Element(i)
+						id := int64(o.Type()) << 59
+						id |= int64(o.Id())
+
+						oi := id >> 25
+						_, ok := vvs[oi]
+						if !ok {
+							vvs[oi] = &tvs{make([]tp, 128*1024), 0}
+						}
+						vs := vvs[oi]
+						vs.t[vs.l].i = id
+						vs.t[vs.l].b = qt
+						vs.l += 1
+
+						if vs.l == 128*1024 {
+							sort.Sort(vs)
+							b := vs.pack()
+							bp, _ := utils.Compress(b)
+							outc <- Kbb{oi, len(b), bp}
+							vs.l = 0
+							b = nil
+						}
+						vvs[oi] = vs
+					}
+				}
+				for oi, vs := range vvs {
+					if vs.l > 0 {
+						sort.Sort(vs)
+						b := vs.pack()
+						bp, _ := utils.Compress(b)
+						outc <- Kbb{oi, len(b), bp}
+					}
+					delete(vvs, oi)
+				}
+
+				wg.Done()
+
+			}(inc)
+		}
+
+		wg.Wait()
+		close(outc)
 		close(qtc)
 		//println("done")
 	}()
@@ -236,8 +230,6 @@ func IterObjectLocations(inputChans []chan elements.ExtendedBlock, blSize int64,
 	for c := range outc {
 		tc[c.K] = append(tc[c.K], c)
 	}
-
-	
 
 	outch := make(chan Kbb)
 
@@ -261,7 +253,7 @@ func IterObjectLocations(inputChans []chan elements.ExtendedBlock, blSize int64,
 	go func() {
 		wg := sync.WaitGroup{}
 		ml := sync.Mutex{}
-		
+
 		for i := 0; i < np; i++ {
 			wg.Add(1)
 			go func(i int) {
@@ -277,7 +269,7 @@ func IterObjectLocations(inputChans []chan elements.ExtendedBlock, blSize int64,
 					nb := makeCC(qtl, tt, outch, blSize)
 
 					ml.Lock()
-					fmt.Printf("[%d %-5d]: %-4d blobs [%-10d bytes] => %-8d objs in %-7d pcks [%5.1f%%]\n", i, k, len(tc[k]), nbs, tt.l, nb, float64(tt.l)/float64(nb)*100.0/32.0)
+					log.Printf("[%d %-5d]: %-4d blobs [%-10d bytes] => %-8d objs in %-7d pcks [%5.1f%%]\n", i, k, len(tc[k]), nbs, tt.l, nb, float64(tt.l)/float64(nb)*100.0/32.0)
 					delete(tc, k)
 					ml.Unlock()
 
@@ -289,7 +281,6 @@ func IterObjectLocations(inputChans []chan elements.ExtendedBlock, blSize int64,
 		wg.Wait()
 		close(outch)
 	}()
-    
-    return outch, qtm
+
+	return outch, qtm
 }
-    

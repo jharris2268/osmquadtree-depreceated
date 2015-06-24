@@ -7,7 +7,7 @@ package write
 
 import (
 	"github.com/jharris2268/osmquadtree/quadtree"
-    "github.com/jharris2268/osmquadtree/utils"
+	"github.com/jharris2268/osmquadtree/utils"
 )
 
 func packBbox(bbox *quadtree.Bbox) ([]byte, error) {

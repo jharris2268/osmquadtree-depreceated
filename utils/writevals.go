@@ -157,12 +157,12 @@ func ReadPbfTag(buf []byte, pos int) (int, PbfMsg) {
 }
 
 func ReadPbfTagSlice(buf []byte) PbfMsgSlice {
-    ans:=make(PbfMsgSlice,0, 25)
-    pos,tg := ReadPbfTag(buf,0)
-    for ; tg.Tag>0; pos,tg=ReadPbfTag(buf,pos) {
-        ans=append(ans,tg)
-    }
-    return ans
+	ans := make(PbfMsgSlice, 0, 25)
+	pos, tg := ReadPbfTag(buf, 0)
+	for ; tg.Tag > 0; pos, tg = ReadPbfTag(buf, pos) {
+		ans = append(ans, tg)
+	}
+	return ans
 }
 
 func WritePbfData(data []byte, pos int, tag uint64, blob []byte) ([]byte, int) {
@@ -234,7 +234,7 @@ func Intm(f float64) int64 {
 	return int64(f*10000000 - 0.5)
 }
 func AsFloat(i int64) float64 {
-    return float64(i) * 0.0000001
+	return float64(i) * 0.0000001
 }
 
 func ParseStringInt(ins string) (int64, bool, error) {

@@ -11,31 +11,31 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
-	
+
+	"path/filepath"
+	"sort"
 	"strings"
-    "sort"
-    "path/filepath"
-    
-    "runtime"
-    "runtime/pprof"
-    "os/signal"
-    "syscall"
+
+	"os/signal"
+	"runtime"
+	"runtime/pprof"
+	"syscall"
 )
 
 func WriteMemoryProfile() error {
-    tempdir:=os.Getenv("GOPATH")
-    f,err := ioutil.TempFile(tempdir, "osmquadtree.utils.memprofile")
-    if err != nil {
-        return err
-    }
-    pprof.WriteHeapProfile(f)
-    p,_:=f.Seek(0,2)
-    f.Close()
-    fmt.Printf("Memprofile: %d bytes to %s [%s]\n", p, f.Name(),MemstatsStr())
-    return nil
-}    
-
+	tempdir := os.Getenv("GOPATH")
+	f, err := ioutil.TempFile(tempdir, "osmquadtree.utils.memprofile")
+	if err != nil {
+		return err
+	}
+	pprof.WriteHeapProfile(f)
+	p, _ := f.Seek(0, 2)
+	f.Close()
+	log.Printf("Memprofile: %d bytes to %s [%s]\n", p, f.Name(), MemstatsStr())
+	return nil
+}
 
 func MemstatsStr() string {
 	//not possibile in windows??
@@ -70,14 +70,14 @@ func FileExists(fn string) (bool, error) {
 }
 
 func GetFileNamesWithExtension(dir string, ext string) ([]string, error) {
-    
-    ok,err := FileExists(dir)
-    if !ok {
-        return nil, errors.New("No such file")
-    }
-    
+
+	ok, err := FileExists(dir)
+	if !ok {
+		return nil, errors.New("No such file")
+	}
+
 	if strings.HasSuffix(dir, ext) {
-        return []string{dir}, nil
+		return []string{dir}, nil
 	}
 
 	dc, err := ioutil.ReadDir(dir)
@@ -86,29 +86,29 @@ func GetFileNamesWithExtension(dir string, ext string) ([]string, error) {
 	}
 	fn := make([]string, 0, len(dc))
 	for _, f := range dc {
-		
+
 		if strings.HasSuffix(f.Name(), ext) {
-			fn = append(fn, filepath.Join(dir,f.Name()))
+			fn = append(fn, filepath.Join(dir, f.Name()))
 		}
 	}
 	sort.Sort(sort.StringSlice(fn))
 	if len(fn) == 0 {
-		return nil, errors.New("no " + ext +" files in directory")
+		return nil, errors.New("no " + ext + " files in directory")
 	}
 	return fn, nil
 }
 
 func OnTerm() {
-    c := make(chan os.Signal, 1)
-    signal.Notify(c, os.Interrupt)
-    signal.Notify(c, syscall.SIGTERM)
-    go func() {
-        z:=<-c
-        fmt.Println("TERM", z)
-        buf := make([]byte, 1<<16)
-        sl:=runtime.Stack(buf, true)
-        fmt.Println(string(buf[:sl]))
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	signal.Notify(c, syscall.SIGTERM)
+	go func() {
+		z := <-c
+		log.Println("TERM", z)
+		buf := make([]byte, 1<<16)
+		sl := runtime.Stack(buf, true)
+		log.Println(string(buf[:sl]))
 
-        os.Exit(1)
-    }()
+		os.Exit(1)
+	}()
 }

@@ -6,119 +6,147 @@
 package quadtree
 
 import (
-    "fmt"
+	"fmt"
 )
 
-
 func ToFloat(i int64) float64 {
-    return float64(i)*0.0000001
+	return float64(i) * 0.0000001
 }
 
 func ToInt(f float64) int64 {
-    if f<0 {
-        return int64((f*10000000.0)-0.5)
-    }
-    return int64((f*10000000.0)+0.5)
+	if f < 0 {
+		return int64((f * 10000000.0) - 0.5)
+	}
+	return int64((f * 10000000.0) + 0.5)
 }
-
 
 //Bounding box made up of integer values of 10^-7 degrees.
 type Bbox struct {
-    Minx, Miny, Maxx, Maxy int64
+	Minx, Miny, Maxx, Maxy int64
 }
 
 const MaxLon = int64(1800000000)
-const MaxLat = MaxLon/2
-const MinLon = -1*MaxLon
-const MinLat = -1*MaxLat
-
+const MaxLat = MaxLon / 2
+const MinLon = -1 * MaxLon
+const MinLat = -1 * MaxLat
 
 func NullBbox() *Bbox {
-    return &Bbox{MaxLon,MaxLat,MinLon,MinLat}
+	return &Bbox{MaxLon, MaxLat, MinLon, MinLat}
 }
 
 func PlanetBbox() *Bbox {
-    return &Bbox{MinLon,MinLat,MaxLon,MaxLat}
+	return &Bbox{MinLon, MinLat, MaxLon, MaxLat}
 }
 
 func (bbox Bbox) String() string {
-    return fmt.Sprintf("[%10d, %10d, %10d, %10d]",
-            bbox.Minx,bbox.Miny,
-            bbox.Maxx,bbox.Maxy)
+	return fmt.Sprintf("[%10d, %10d, %10d, %10d]",
+		bbox.Minx, bbox.Miny,
+		bbox.Maxx, bbox.Maxy)
 }
 
 func BboxFromSlice(sl []int64) Bbox {
-    if len(sl)!=4 { return *NullBbox() }
-    return Bbox{sl[0],sl[1],sl[2],sl[3]}
+	if len(sl) != 4 {
+		return *NullBbox()
+	}
+	return Bbox{sl[0], sl[1], sl[2], sl[3]}
 }
 
 //Return true if bbox overlaps other
 func (bbox Bbox) Intersects(other Bbox) bool {
-    if (bbox.Minx > other.Maxx) { return false }
-    if (bbox.Miny > other.Maxy) { return false }
-    if (bbox.Maxx < other.Minx) { return false }
-    if (bbox.Maxy < other.Miny) { return false }
-    return true
+	if bbox.Minx > other.Maxx {
+		return false
+	}
+	if bbox.Miny > other.Maxy {
+		return false
+	}
+	if bbox.Maxx < other.Minx {
+		return false
+	}
+	if bbox.Maxy < other.Miny {
+		return false
+	}
+	return true
 }
 
 //Return true if bbox contains other
 func (bbox Bbox) Contains(other Bbox) bool {
-    if (bbox.Minx > other.Minx) { return false }
-    if (bbox.Miny > other.Minx) { return false }
-    if (bbox.Maxx < other.Maxx) { return false }
-    if (bbox.Maxy < other.Maxy) { return false }
-    return true
+	if bbox.Minx > other.Minx {
+		return false
+	}
+	if bbox.Miny > other.Minx {
+		return false
+	}
+	if bbox.Maxx < other.Maxx {
+		return false
+	}
+	if bbox.Maxy < other.Maxy {
+		return false
+	}
+	return true
 }
 
 //Return true if bbox contains point
-func (bbox Bbox) ContainsXY(x,y int64) bool {
-    if (bbox.Minx > x) { return false }
-    if (bbox.Miny > y) { return false }
-    if (bbox.Maxx < x) { return false }
-    if (bbox.Maxy < y) { return false }
-    return true
+func (bbox Bbox) ContainsXY(x, y int64) bool {
+	if bbox.Minx > x {
+		return false
+	}
+	if bbox.Miny > y {
+		return false
+	}
+	if bbox.Maxx < x {
+		return false
+	}
+	if bbox.Maxy < y {
+		return false
+	}
+	return true
 }
 
 //Expand to include other
 func (bbox *Bbox) ExpandBox(other Bbox) *Bbox {
-    return bbox.Expand(other.Minx,other.Miny,other.Maxx,other.Maxy)
+	return bbox.Expand(other.Minx, other.Miny, other.Maxx, other.Maxy)
 }
 
 //Expand to include other bbox
-func (bbox *Bbox) Expand(mx,my,Mx,My int64) *Bbox {
-    if mx < bbox.Minx { bbox.Minx = mx }
-    if my < bbox.Miny { bbox.Miny = my }
-    if Mx > bbox.Maxx { bbox.Maxx = Mx }
-    if My > bbox.Maxy { bbox.Maxy = My }
-    
-    return bbox
+func (bbox *Bbox) Expand(mx, my, Mx, My int64) *Bbox {
+	if mx < bbox.Minx {
+		bbox.Minx = mx
+	}
+	if my < bbox.Miny {
+		bbox.Miny = my
+	}
+	if Mx > bbox.Maxx {
+		bbox.Maxx = Mx
+	}
+	if My > bbox.Maxy {
+		bbox.Maxy = My
+	}
+
+	return bbox
 
 }
 
 //Expand to include point (given by points)
-func (bbox *Bbox) ExpandXY(x,y int64) *Bbox {
-    return bbox.Expand(x,y,x,y)
+func (bbox *Bbox) ExpandXY(x, y int64) *Bbox {
+	return bbox.Expand(x, y, x, y)
 }
 
 //Expand to include pt, which satisfies
 //interface{ Lon() int64, Lat() int64} (such as a elements.FullNode)
-func (bbox *Bbox) ExpandPt(pt interface{} ) *Bbox {
-    lnlt,ok := pt.(interface{
-        Lon() int64
-        Lat() int64
-    })
-    
-    if !ok {
-        return nil
-    }
-    return bbox.ExpandXY(lnlt.Lon(), lnlt.Lat())
+func (bbox *Bbox) ExpandPt(pt interface{}) *Bbox {
+	lnlt, ok := pt.(interface {
+		Lon() int64
+		Lat() int64
+	})
+
+	if !ok {
+		return nil
+	}
+	return bbox.ExpandXY(lnlt.Lon(), lnlt.Lat())
 }
 
-
-
-
 type LonLatBlock interface {
-    Len() int
+	Len() int
 	Lon(i int) int64
 	Lat(i int) int64
 }

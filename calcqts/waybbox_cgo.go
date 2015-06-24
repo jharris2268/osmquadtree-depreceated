@@ -127,11 +127,11 @@ WayBoxes WayBoxesInit(int mxw) {
         wb->c[i]=-2000000000;
         wb->d[i]=-2000000000;
     }
-    return wb;    
+    return wb;
 }
 
 int WayBoxesExpand(WayBoxes wb, int w, int ln, int lt) {
-    
+
     //struct wayBoxImpl *wb = wbp;
     if (w >= wb->mxw) {
         return;
@@ -209,66 +209,65 @@ int WayBoxesNext(WayBoxes wb, int w) {
 import "C"
 
 import (
-    "github.com/jharris2268/osmquadtree/quadtree"
-    "fmt"
+	"log"
+
+	"github.com/jharris2268/osmquadtree/quadtree"
 )
 
-
 type wayBboxTileCgo struct {
-    boxes C.WayBoxes
-    length int
+	boxes  C.WayBoxes
+	length int
 }
 
 func (wbt *wayBboxTileCgo) Expand(i int, ln int64, lt int64) bool {
-    if wbt.boxes==nil {
-        panic("wbt.boxes==nil")
-    }
-    if C.WayBoxesExpand(wbt.boxes, C.int(i), C.int(ln), C.int(lt))==C.int(1) {
-        wbt.length++
-        return true
-    }
-    return false
+	if wbt.boxes == nil {
+		panic("wbt.boxes==nil")
+	}
+	if C.WayBoxesExpand(wbt.boxes, C.int(i), C.int(ln), C.int(lt)) == C.int(1) {
+		wbt.length++
+		return true
+	}
+	return false
 }
 func (wbt *wayBboxTileCgo) Get(i int) quadtree.Bbox {
-    ci:=C.int(i)
-    if C.WayBoxesHasValue(wbt.boxes,ci)==C.int(0) {
-        return *quadtree.NullBbox()
-    }
-    return quadtree.Bbox{
-            int64(C.WayBoxesMinx(wbt.boxes,ci)), 
-            int64(C.WayBoxesMiny(wbt.boxes,ci)), 
-            int64(C.WayBoxesMaxx(wbt.boxes,ci)), 
-            int64(C.WayBoxesMaxy(wbt.boxes,ci)),
-    }
+	ci := C.int(i)
+	if C.WayBoxesHasValue(wbt.boxes, ci) == C.int(0) {
+		return *quadtree.NullBbox()
+	}
+	return quadtree.Bbox{
+		int64(C.WayBoxesMinx(wbt.boxes, ci)),
+		int64(C.WayBoxesMiny(wbt.boxes, ci)),
+		int64(C.WayBoxesMaxx(wbt.boxes, ci)),
+		int64(C.WayBoxesMaxy(wbt.boxes, ci)),
+	}
 }
 
 func (wbt *wayBboxTileCgo) CalcQuadtree(buf float64, mxl uint) (int, quadtreeTile) {
-    
-    if wbt.boxes==nil {
-        panic("wbt.boxes==nil")
-    }
-    
-    ll:=0
-    res:=newQuadtreeTile()
-    for i:=C.WayBoxesNext(wbt.boxes,C.int(0)); i < C.int(tileSz); i=C.WayBoxesNext(wbt.boxes,i+1) {
-        qt := C.WayBoxesQuadtree(wbt.boxes,i,C.double(buf),C.size_t(mxl))
-        ll++
-        if qt<0 {
-            fmt.Println("??",i,qt)
-        } else {
-            res.Set(int(i), quadtree.Quadtree(qt))
-        }
-    }
-    C.WayBoxesFree(wbt.boxes)
-    wbt.boxes=nil
-    return ll,res
+
+	if wbt.boxes == nil {
+		panic("wbt.boxes==nil")
+	}
+
+	ll := 0
+	res := newQuadtreeTile()
+	for i := C.WayBoxesNext(wbt.boxes, C.int(0)); i < C.int(tileSz); i = C.WayBoxesNext(wbt.boxes, i+1) {
+		qt := C.WayBoxesQuadtree(wbt.boxes, i, C.double(buf), C.size_t(mxl))
+		ll++
+		if qt < 0 {
+			log.Println("??", i, qt)
+		} else {
+			res.Set(int(i), quadtree.Quadtree(qt))
+		}
+	}
+	C.WayBoxesFree(wbt.boxes)
+	wbt.boxes = nil
+	return ll, res
 }
 
 func (wbt *wayBboxTileCgo) Len() int {
-    return wbt.length
+	return wbt.length
 }
 
 func newWayBboxTileCgo() wayBboxTile {
-    return &wayBboxTileCgo{C.WayBoxesInit(C.int(tileSz)),0}
+	return &wayBboxTileCgo{C.WayBoxesInit(C.int(tileSz)), 0}
 }
-

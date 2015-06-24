@@ -8,31 +8,30 @@
 package locationscache
 
 import (
-    "errors"
-    
-    "github.com/jharris2268/osmquadtree/elements"
-    "github.com/jharris2268/osmquadtree/quadtree"
+	"errors"
+
+	"github.com/jharris2268/osmquadtree/elements"
+	"github.com/jharris2268/osmquadtree/quadtree"
 )
 
 var ldbNotDefined = errors.New("leveldb not availble on windows")
 
 func MakeLocationsCacheLevelDb(
-        inputChans []chan elements.ExtendedBlock,
-        inputfn string, prfx string, enddate int64, state int64) error {
-    
-    return ldbNotDefined
+	inputChans []chan elements.ExtendedBlock,
+	inputfn string, prfx string, enddate int64, state int64) error {
+
+	return ldbNotDefined
 }
 
-
-func OpenLevelDbLocationsCache(prfx string) (LocationsCache,error) {
-    return nil, ldbNotDefined
+func OpenLevelDbLocationsCache(prfx string) (LocationsCache, error) {
+	return nil, ldbNotDefined
 }
 func GetCacheSpecsLevelDb(prfx string) ([]IdxItem, []quadtree.Quadtree, error) {
-    
-    return nil,nil,ldbNotDefined
+
+	return nil, nil, ldbNotDefined
 }
 
 func GetLastStateLevelDb(prfx string) (int64, error) {
-    
-    return -1,ldbNotDefined
+
+	return -1, ldbNotDefined
 }

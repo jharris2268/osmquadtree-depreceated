@@ -7,6 +7,7 @@ package elements
 
 import (
 	"fmt"
+
 	"github.com/jharris2268/osmquadtree/quadtree"
 	//"time"
 	"strings"
@@ -263,7 +264,7 @@ type unpackedInfo struct {
 	cs   Ref
 	ui   int64
 	user string
-    vis  bool
+	vis  bool
 }
 
 func (upi *unpackedInfo) Version() int64       { return upi.vs }
@@ -274,11 +275,11 @@ func (upi *unpackedInfo) User() string         { return upi.user }
 func (upi *unpackedInfo) Visible() bool        { return upi.vis }
 
 func MakeInfo(vs int64, ts Timestamp, cs Ref, ui int64, user string, vis bool) Info {
-	return &unpackedInfo{vs, ts, cs, ui, user,vis}
+	return &unpackedInfo{vs, ts, cs, ui, user, vis}
 }
 
 func (upt *unpackedInfo) Pack() []byte {
-	return packInfo(upt.vs, upt.ts, upt.cs, upt.ui, upt.user,upt.vis)
+	return packInfo(upt.vs, upt.ts, upt.cs, upt.ui, upt.user, upt.vis)
 }
 
 type packedGeometry struct {

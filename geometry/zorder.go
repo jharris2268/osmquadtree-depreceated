@@ -8,12 +8,11 @@ package geometry
 import (
 	"github.com/jharris2268/osmquadtree/elements"
 	"github.com/jharris2268/osmquadtree/quadtree"
-	
-	"strconv"
-    "strings"
+
 	"errors"
 	"math"
-	
+	"strconv"
+	"strings"
 )
 
 var hworder map[string]int64
@@ -57,15 +56,15 @@ func is_false(v string) bool {
 	return false
 }
 
-func find_zorder(tt elements.Tags) (int64,error) {
-    if hworder ==nil {
-        init_hworder()
-    }
-	
+func find_zorder(tt elements.Tags) (int64, error) {
+	if hworder == nil {
+		init_hworder()
+	}
+
 	zo := int64(0)
 	l := int64(0)
 	haszo := ""
-	
+
 	for i := 0; i < tt.Len(); i++ {
 		k := tt.Key(i)
 		v := tt.Value(i)
@@ -115,11 +114,9 @@ func find_zorder(tt elements.Tags) (int64,error) {
 	}
 
 	zo += l * 10
-    
-    return zo,nil
+
+	return zo, nil
 }
-
-
 
 func same_point(a, b Coord) bool {
 	if a.Lon() != b.Lon() {
@@ -147,11 +144,10 @@ func drop_repeats(rr []Coord) []Coord {
 	return np
 }
 
+func calculate_polygon_area(poly [][]Coord) (float64, error) {
+	polyArea := 0.0
 
-func calculate_polygon_area(poly [][]Coord) (float64,error) {
-    polyArea := 0.0
-    
-    for i, p := range poly {
+	for i, p := range poly {
 		a := 1.0
 		if i > 0 {
 			a = -1.0
@@ -176,8 +172,6 @@ func reverse_ring(rr []Coord) {
 	}
 }
 
-
-
 func calculate_ring_area(rr []Coord) (float64, bool) {
 
 	numpt := len(rr)
@@ -200,7 +194,6 @@ func calculate_ring_area(rr []Coord) (float64, bool) {
 
 	return math.Abs(ss) / 2.0, ss > 0
 
-	
 }
 
 func rings_intersect(lhs, rhs []Coord) bool {
@@ -215,13 +208,14 @@ func rings_intersect(lhs, rhs []Coord) bool {
 }
 
 type llb []Coord
-func (l llb) Len() int { return len(l) }
+
+func (l llb) Len() int        { return len(l) }
 func (l llb) Lat(i int) int64 { return l[i].Lat() }
 func (l llb) Lon(i int) int64 { return l[i].Lon() }
 
 func ring_contains(outer, inner []Coord) bool {
 	if !rings_intersect(outer, inner) {
-		return quadtree.PointInPoly(llb(outer), inner[0].Lon(),inner[0].Lat())
+		return quadtree.PointInPoly(llb(outer), inner[0].Lon(), inner[0].Lat())
 	}
 	return false
 }
@@ -241,16 +235,14 @@ func lines_intersect(p0, p1, p2, p3 Coord) bool {
 	return (s >= 0 && s <= 1 && t >= 0 && t <= 1)
 }
 
-
-
 // FindParentHighway returns the highway value from highways with the
 // highest z_order value. This behaviour should match that of osm2pgsql.
 func FindParentHighway(highways []string) string {
 	mv := ""
-    if len(highways)==0 {
-        return mv
-    }
-    
+	if len(highways) == 0 {
+		return mv
+	}
+
 	sc := int64(0)
 
 	if hworder == nil {
@@ -278,7 +270,7 @@ func FindParentHighway(highways []string) string {
 			}
 		}
 		//if len(ppm) > 1 {
-		//	fmt.Println("pick", mv, "from", ppm)
+		//	log.Println("pick", mv, "from", ppm)
 		//}
 	}
 	return mv

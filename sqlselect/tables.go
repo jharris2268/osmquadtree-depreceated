@@ -307,7 +307,9 @@ func (sr *simpleRower) Key() string { return sr.key }
 
 func (sr *simpleRower) Value(inrow Row) Value {
 	i := inrow.Index(sr.key)
-    if i<0 { return nullValue() }
+	if i < 0 {
+		return nullValue()
+	}
 	return inrow.Value(i)
 }
 

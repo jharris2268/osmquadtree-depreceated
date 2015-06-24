@@ -13,7 +13,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	
 )
 
 func ReadBlock(file io.Reader, size uint64) ([]byte, error) {

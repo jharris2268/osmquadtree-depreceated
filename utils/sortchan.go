@@ -26,9 +26,9 @@ func SortIdxerChan(inc <-chan Idxer) <-chan Idxer {
 					s, ok = tt[nv]
 				}
 			} else if b.Idx() < nv {
-                println("??WTF??",b.Idx(), nv)
-                res <- b
-            } else {
+				println("??WTF??", b.Idx(), nv)
+				res <- b
+			} else {
 				tt[b.Idx()] = b
 			}
 			if len(tt) > 2000 {

@@ -16,8 +16,8 @@ import (
 	//"reflect"
 
 	"github.com/jharris2268/osmquadtree/utils"
-    
-    "runtime"
+
+	"runtime"
 )
 
 type fileBlock struct {
@@ -26,8 +26,6 @@ type fileBlock struct {
 	blockType []byte
 	blockData []byte
 }
-
-
 
 func readNextBlock(file io.ReadSeeker, idx int) (*fileBlock, error) {
 	pos, err := file.Seek(0, 1)
@@ -138,10 +136,10 @@ func ReadPbfFileBlocks(file io.ReadSeeker) <-chan FileBlock {
 	res := make(chan FileBlock)
 	i := 0
 	go func() {
-        fc,ok := file.(io.ReadCloser)
-        if ok {
-            defer fc.Close()
-        }
+		fc, ok := file.(io.ReadCloser)
+		if ok {
+			defer fc.Close()
+		}
 
 		for {
 			bl, err := readNextBlock(file, i)
@@ -170,7 +168,7 @@ func ReadPbfFileBlocksMulti(file *os.File, nc int) <-chan FileBlock {
 	resA := make(chan *fileBlock)
 	i := 0
 	go func() {
-        
+
 		defer file.Close()
 		for {
 			bl, err := readNextBlock(file, i)
@@ -353,8 +351,6 @@ type FileBlockWrite interface {
 	BlockData() []byte
 }
 
-
-
 type Quadtreer interface {
 	Quadtree() int64
 	IsChange() bool
@@ -460,29 +456,28 @@ func WriteFileBlocks(file io.WriteSeeker, inBlocks <-chan FileBlockWrite) (Block
 		}*/
 		blockLens = append(blockLens, blckln)
 	}
-    
-    sy,ok := file.(interface{ Sync() })
-    if ok {
-        sy.Sync()
-    }
-    
+
+	sy, ok := file.(interface {
+		Sync()
+	})
+	if ok {
+		sy.Sync()
+	}
+
 	//file.Sync()
 	return blockLens, nil
 }
-
-
-
 
 func ReadPbfFileBlocksDefer(file io.ReadSeeker) <-chan FileBlock {
 	resA := make(chan FileBlock)
 	i := 0
 	go func() {
-        runtime.LockOSThread()
-        defer runtime.UnlockOSThread()
-		fc,ok := file.(io.ReadCloser)
-        if ok {
-            defer fc.Close()
-        }
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		fc, ok := file.(io.ReadCloser)
+		if ok {
+			defer fc.Close()
+		}
 		for {
 			bl, err := readNextBlock(file, i)
 			i++
@@ -494,55 +489,54 @@ func ReadPbfFileBlocksDefer(file io.ReadSeeker) <-chan FileBlock {
 
 				return
 			}
-			resA <- &deferedFileBlock{bl,false}
+			resA <- &deferedFileBlock{bl, false}
 		}
 	}()
 	return resA
 }
 
 type deferedFileBlock struct {
-    fb *fileBlock
-    cc bool
+	fb *fileBlock
+	cc bool
 }
 
 func (dfb *deferedFileBlock) calc() *fileBlock {
-    if dfb.cc {
-        return dfb.fb
-    }
-    dfb.cc=true
-    bl, err := readBlockData(dfb.fb)
-    if err != nil {
-        dfb.fb = &fileBlock{dfb.fb.idx, dfb.fb.filePos, []byte("ERROR"), []byte(err.Error())}
-    } else {
-        dfb.fb = bl
-    }
-    return dfb.fb
+	if dfb.cc {
+		return dfb.fb
+	}
+	dfb.cc = true
+	bl, err := readBlockData(dfb.fb)
+	if err != nil {
+		dfb.fb = &fileBlock{dfb.fb.idx, dfb.fb.filePos, []byte("ERROR"), []byte(err.Error())}
+	} else {
+		dfb.fb = bl
+	}
+	return dfb.fb
 }
 
-func (dfb *deferedFileBlock) Idx() int { return dfb.calc().Idx() }
+func (dfb *deferedFileBlock) Idx() int            { return dfb.calc().Idx() }
 func (dfb *deferedFileBlock) FilePosition() int64 { return dfb.calc().FilePosition() }
 func (dfb *deferedFileBlock) BlockType() []byte   { return dfb.calc().BlockType() }
 func (dfb *deferedFileBlock) BlockData() []byte   { return dfb.calc().BlockData() }
-
 
 func ReadPbfFileBlocksDeferPartial(file io.ReadSeeker, locs []int64) <-chan FileBlock {
 	resA := make(chan FileBlock)
 	//i := 0
 	go func() {
-        runtime.LockOSThread()
-        defer runtime.UnlockOSThread()
-		fc,ok := file.(io.ReadCloser)
-        if ok {
-            defer fc.Close()
-        }
-		for i,lc := range locs {
-            _, err := file.Seek(lc,0)
-            if err != nil {
-                println(err.Error())
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		fc, ok := file.(io.ReadCloser)
+		if ok {
+			defer fc.Close()
+		}
+		for i, lc := range locs {
+			_, err := file.Seek(lc, 0)
+			if err != nil {
+				println(err.Error())
 				close(resA)
-                return
-            }
-            
+				return
+			}
+
 			bl, err := readNextBlock(file, i)
 			i++
 			if err != nil {
@@ -553,65 +547,63 @@ func ReadPbfFileBlocksDeferPartial(file io.ReadSeeker, locs []int64) <-chan File
 
 				return
 			}
-			resA <- &deferedFileBlock{bl,false}
+			resA <- &deferedFileBlock{bl, false}
 		}
-        close(resA)
+		close(resA)
 	}()
 	return resA
 }
 
-
 func ReadPbfFileBlocksDeferSplitPartial(file io.ReadSeeker, locs []int64, ns int) []<-chan FileBlock {
-	resA := make([]chan FileBlock,ns)
-    for i,_ := range resA {
-        resA[i] = make(chan FileBlock)
-    }
+	resA := make([]chan FileBlock, ns)
+	for i, _ := range resA {
+		resA[i] = make(chan FileBlock)
+	}
 	//i := 0
 	go func() {
-        runtime.LockOSThread()
-        defer runtime.UnlockOSThread()
-		fc,ok := file.(io.ReadCloser)
-        if ok {
-            defer fc.Close()
-        }
-		for i,lc := range locs {
-            _, err := file.Seek(lc,0)
-            if err != nil {
-                println(err.Error())
-				for _,r:=range resA {
-                    close(r)
-                }
-                return
-            }
-            
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		fc, ok := file.(io.ReadCloser)
+		if ok {
+			defer fc.Close()
+		}
+		for i, lc := range locs {
+			_, err := file.Seek(lc, 0)
+			if err != nil {
+				println(err.Error())
+				for _, r := range resA {
+					close(r)
+				}
+				return
+			}
+
 			bl, err := readNextBlock(file, i)
 			i++
 			if err != nil {
 				if err != io.EOF {
 					println(err.Error())
 				}
-				for _,r:=range resA {
-                    close(r)
-                }
+				for _, r := range resA {
+					close(r)
+				}
 
 				return
 			}
-			resA[bl.Idx()%ns] <- &deferedFileBlock{bl,false}
+			resA[bl.Idx()%ns] <- &deferedFileBlock{bl, false}
 		}
-        for _,r:=range resA {
-            close(r)
-        }
-            
+		for _, r := range resA {
+			close(r)
+		}
+
 	}()
-    
-    resRet := make([]<-chan FileBlock,ns)
-    for i,r:=range resA {
-        resRet[i]=r
-    }
-    
+
+	resRet := make([]<-chan FileBlock, ns)
+	for i, r := range resA {
+		resRet[i] = r
+	}
+
 	return resRet
 }
-
 
 func ReadPbfFileBlockAtDefered(file io.ReadSeeker, pos int64) (FileBlock, error) {
 	_, err := file.Seek(pos, 0)
@@ -623,25 +615,23 @@ func ReadPbfFileBlockAtDefered(file io.ReadSeeker, pos int64) (FileBlock, error)
 	if err != nil {
 		return nil, err
 	}
-	return &deferedFileBlock{bl,false},nil
+	return &deferedFileBlock{bl, false}, nil
 }
 
-
-
 func ReadPbfFileBlocksDeferSplit(file io.ReadSeeker, ns int) []<-chan FileBlock {
-    
-	resA := make([]chan FileBlock,ns)
-    for i,_ := range resA {
-        resA[i] = make(chan FileBlock)
-    }
+
+	resA := make([]chan FileBlock, ns)
+	for i, _ := range resA {
+		resA[i] = make(chan FileBlock)
+	}
 	i := 0
 	go func() {
-        runtime.LockOSThread()
-        defer runtime.UnlockOSThread()
-		fc,ok := file.(io.ReadCloser)
-        if ok {
-            defer fc.Close()
-        }
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		fc, ok := file.(io.ReadCloser)
+		if ok {
+			defer fc.Close()
+		}
 		for {
 			bl, err := readNextBlock(file, i)
 			i++
@@ -649,23 +639,23 @@ func ReadPbfFileBlocksDeferSplit(file io.ReadSeeker, ns int) []<-chan FileBlock 
 				if err != io.EOF {
 					println(err.Error())
 				}
-                for _,r:=range resA {
-                    close(r)
-                }
+				for _, r := range resA {
+					close(r)
+				}
 				return
 			}
-			resA[bl.Idx()%ns] <- &deferedFileBlock{bl,false}
+			resA[bl.Idx()%ns] <- &deferedFileBlock{bl, false}
 		}
-        for _,r:=range resA {
-            close(r)
-        }
-            
+		for _, r := range resA {
+			close(r)
+		}
+
 	}()
-    
-    resRet := make([]<-chan FileBlock,ns)
-    for i,r:=range resA {
-        resRet[i]=r
-    }
-    
+
+	resRet := make([]<-chan FileBlock, ns)
+	for i, r := range resA {
+		resRet[i] = r
+	}
+
 	return resRet
 }

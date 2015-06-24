@@ -8,6 +8,7 @@ package sqlselect
 import (
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -362,7 +363,7 @@ type LexResult struct {
 
 func (l *LexResult) Error(s string) {
 	l.err = true
-	fmt.Printf("prob @ line %d %s\n", l.pl, s)
+	log.Printf("prob @ line %d %s\n", l.pl, s)
 	si := l.pl - 5
 	if si < 0 {
 		si = 0
@@ -372,7 +373,7 @@ func (l *LexResult) Error(s string) {
 		ti = len(l.items)
 	}
 	for i := si; i < ti; i++ {
-		fmt.Printf("[%-4d]: %s\n", i, l.items[i])
+		log.Printf("[%-4d]: %s\n", i, l.items[i])
 	}
 
 }
@@ -490,14 +491,14 @@ func (l *LexResult) Lex(lval *yySymType) int {
 	case ItemKeyword:
 		return toLexInt(l.items[l.pl].Item)
 	}
-	fmt.Printf("?? %d: %v %d\n", l.pl, lval.str, c)
+	log.Printf("?? %d: %v %d\n", l.pl, lval.str, c)
 
 	return LEX_ERROR
 }
 
 func Parse(input string) (Tabler, error) {
 	l := &LexResult{LexList(input), -1, false, nil}
-	//fmt.Printf("%v %d\n",l.items, l.pl)
+	//log.Printf("%v %d\n",l.items, l.pl)
 	e := yyParse(l)
 	if e == 0 && !l.err {
 		return l.result, nil

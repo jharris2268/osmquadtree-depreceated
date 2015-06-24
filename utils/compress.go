@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+
 	zlib "github.com/jharris2268/osmquadtree/utils/cgzip"
 )
 

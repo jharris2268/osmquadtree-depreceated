@@ -7,8 +7,9 @@ package elements
 
 import (
 	"fmt"
-	"github.com/jharris2268/osmquadtree/quadtree"
 	"sort"
+
+	"github.com/jharris2268/osmquadtree/quadtree"
 )
 
 // A list of Element values
@@ -144,15 +145,15 @@ func AsNormalBlock(block Block) Block {
 
 	oo := make(ByElementId, 0, block.Len())
 	for i, _ := range oo {
-        e:=block.Element(i)
-        switch e.ChangeType() {
-            case Normal:
-                oo = append(oo, e)
-            case Delete,Remove:
-                //pass
-            case Unchanged, Modify, Create:
-                oo = append(oo, AsNormal(e))
-        }
+		e := block.Element(i)
+		switch e.ChangeType() {
+		case Normal:
+			oo = append(oo, e)
+		case Delete, Remove:
+			//pass
+		case Unchanged, Modify, Create:
+			oo = append(oo, AsNormal(e))
+		}
 	}
 	return oo
 }

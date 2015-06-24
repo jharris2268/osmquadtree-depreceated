@@ -6,11 +6,11 @@
 package read
 
 import (
+	"github.com/jharris2268/osmquadtree/elements"
 	"github.com/jharris2268/osmquadtree/quadtree"
 	"github.com/jharris2268/osmquadtree/utils"
-    "github.com/jharris2268/osmquadtree/elements"
-    
-    "fmt"
+
+	"fmt"
 	"strings"
 )
 
@@ -37,16 +37,16 @@ func ReadPbfBbox(indata []byte) (quadtree.Bbox, error) {
 }
 
 type blockIdx struct {
-    quadtree            quadtree.Quadtree
-	filepos, blockLen   int64
-	isChange            bool
+	quadtree          quadtree.Quadtree
+	filepos, blockLen int64
+	isChange          bool
 }
 type blockIdxSlice []blockIdx
 
 // BlockIdx contains the file positions for the pbf data blocks within
 // a file. This can be used read only parts of a pbf file: see
 // readfile.ReadExtendedBlockMultiSortedPartial and
-// readfile.ReadExtendedBlockMultiSortedQts 
+// readfile.ReadExtendedBlockMultiSortedQts
 type BlockIdx interface {
 	Len() int
 	Filepos(int) int64
@@ -55,11 +55,11 @@ type BlockIdx interface {
 	IsChange(int) bool
 }
 
-func (bi blockIdxSlice) Len() int             { return len(bi) }
-func (bi blockIdxSlice) Filepos(i int) int64  { return bi[i].filepos }
-func (bi blockIdxSlice) BlockLen(i int) int64 { return bi[i].blockLen }
+func (bi blockIdxSlice) Len() int                         { return len(bi) }
+func (bi blockIdxSlice) Filepos(i int) int64              { return bi[i].filepos }
+func (bi blockIdxSlice) BlockLen(i int) int64             { return bi[i].blockLen }
 func (bi blockIdxSlice) Quadtree(i int) quadtree.Quadtree { return bi[i].quadtree }
-func (bi blockIdxSlice) IsChange(i int) bool  { return bi[i].isChange }
+func (bi blockIdxSlice) IsChange(i int) bool              { return bi[i].isChange }
 
 func (bi blockIdx) String() string {
 	cc := " "
@@ -70,13 +70,12 @@ func (bi blockIdx) String() string {
 		bi.quadtree, cc, bi.filepos, bi.blockLen)
 }
 
-
 // HeaderBlock contains the data found in pbf file HeaderBlock
 type HeaderBlock struct {
-	Bbox     *quadtree.Bbox 
-	Features map[string][]string //The required_features, optional_features, and writing_program fields
-	Index    BlockIdx
-    Timestamp elements.Timestamp
+	Bbox      *quadtree.Bbox
+	Features  map[string][]string //The required_features, optional_features, and writing_program fields
+	Index     BlockIdx
+	Timestamp elements.Timestamp
 }
 
 func (hi *HeaderBlock) String() string {
@@ -127,7 +126,6 @@ func readBlockIdx(indata []byte) (*blockIdx, error) {
 	return ans, nil
 }
 
-
 // ReadHeaderBlock returns a HeaderBlock from pbf message indata. filePos
 // is the file position after the HeaderBlock has been read: this allows
 // the BlockIdx to calculate file positions from the stored block lengths
@@ -140,7 +138,7 @@ func ReadHeaderBlock(indata []byte, filePos int64) (*HeaderBlock, error) {
 		switch msg.Tag {
 		case 4, 5, 16, 17:
 			if ans.Features == nil {
-                // set up features map
+				// set up features map
 				ans.Features = map[string][]string{}
 			}
 
@@ -164,7 +162,7 @@ func ReadHeaderBlock(indata []byte, filePos int64) (*HeaderBlock, error) {
 		case 17:
 			ans.Features["source"] = append(ans.Features["source"], string(msg.Data))
 		case 22:
-            // index of file blocks
+			// index of file blocks
 			if idx == nil || cap(idx) == 0 {
 				idx = make(blockIdxSlice, 0, 350000)
 			}
@@ -173,14 +171,14 @@ func ReadHeaderBlock(indata []byte, filePos int64) (*HeaderBlock, error) {
 				return nil, err
 			}
 			idx = append(idx, *ii)
-        case 32:
-            ans.Timestamp = elements.Timestamp(msg.Value)
+		case 32:
+			ans.Timestamp = elements.Timestamp(msg.Value)
 		}
 		a, msg = utils.ReadPbfTag(indata, a)
 	}
-    
+
 	if len(idx) != 0 {
-        // calculate block positions: cumulative sum of block lens (plus length of header block)
+		// calculate block positions: cumulative sum of block lens (plus length of header block)
 		for i, a := range idx {
 			idx[i].filepos = filePos
 			filePos += a.blockLen

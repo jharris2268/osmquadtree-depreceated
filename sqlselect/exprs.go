@@ -77,9 +77,9 @@ func (pr pickRow) Key() string {
 }
 
 func (pr pickRow) Value(r Row) Value {
-    
+
 	i := r.Index(pr.Key())
-        
+
 	if i < 0 {
 		return nullValue()
 	}

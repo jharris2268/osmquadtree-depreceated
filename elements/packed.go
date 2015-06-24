@@ -7,6 +7,7 @@ package elements
 
 import (
 	"fmt"
+
 	"github.com/jharris2268/osmquadtree/quadtree"
 	"github.com/jharris2268/osmquadtree/utils"
 )
@@ -33,15 +34,15 @@ func PackElement(
 	tl := 50 + len(data) + len(info) + len(tags)
 	p := 0
 	res := make([]byte, tl)
-	res[0] = byte(et) // element type, 1 byte
-	res[1] = byte(ct) // change type, 1 byte
-	p = utils.WriteInt64(res, 2, int64(id)) //write id as fixed size 
+	res[0] = byte(et)                        // element type, 1 byte
+	res[1] = byte(ct)                        // change type, 1 byte
+	p = utils.WriteInt64(res, 2, int64(id))  //write id as fixed size
 	p = utils.WriteVarint(res, p, int64(qt)) //qt as varint
-	p = utils.WriteData(res, p, data) //single 0 if not present
-	p = utils.WriteData(res, p, info) //single 0 if not present
-	p = utils.WriteData(res, p, tags) //single 0 if not present
-    
-    //a packed element can be anything from 14 bytes to several mb (really big geometries)
+	p = utils.WriteData(res, p, data)        //single 0 if not present
+	p = utils.WriteData(res, p, info)        //single 0 if not present
+	p = utils.WriteData(res, p, tags)        //single 0 if not present
+
+	//a packed element can be anything from 14 bytes to several mb (really big geometries)
 	return res[:p]
 }
 
@@ -69,22 +70,22 @@ func (po PackedElement) String() string {
 	return fmt.Sprintf("Packed %d %d %10d [%d bytes]", po.ChangeType(), po.Type(), po.Id(), len(po))
 }
 
-func packInfo(vs int64, ts Timestamp, cs Ref, ui int64, user string,visible bool) []byte {
+func packInfo(vs int64, ts Timestamp, cs Ref, ui int64, user string, visible bool) []byte {
 	l := 50 + len(user)
 	res := make([]byte, l)
-	p := utils.WriteVarint(res, 0, vs)          //version 
-	p = utils.WriteVarint(res, p, int64(ts))    //timestamp (integer)
-	p = utils.WriteVarint(res, p, int64(cs))    //changeset
-	p = utils.WriteVarint(res, p, ui)           //user id
-	p = utils.WriteData(res, p, []byte(user))   //user (utf-8 string)
-    if !visible {
-        res[p] = 0                              //single 0 byte if visible tag is false
-        p++
-    }
+	p := utils.WriteVarint(res, 0, vs)        //version
+	p = utils.WriteVarint(res, p, int64(ts))  //timestamp (integer)
+	p = utils.WriteVarint(res, p, int64(cs))  //changeset
+	p = utils.WriteVarint(res, p, ui)         //user id
+	p = utils.WriteData(res, p, []byte(user)) //user (utf-8 string)
+	if !visible {
+		res[p] = 0 //single 0 byte if visible tag is false
+		p++
+	}
 	return res[:p]
 }
 
-func unpackInfo(buf []byte) (int64, Timestamp, Ref, int64, string,bool) {
+func unpackInfo(buf []byte) (int64, Timestamp, Ref, int64, string, bool) {
 	vs, ts, cs, ui, vv := int64(0), int64(0), int64(0), int64(0), true
 	us := []byte{}
 	p := 0
@@ -93,9 +94,9 @@ func unpackInfo(buf []byte) (int64, Timestamp, Ref, int64, string,bool) {
 	cs, p = utils.ReadVarint(buf, p)
 	ui, p = utils.ReadVarint(buf, p)
 	us, p = utils.ReadData(buf, p)
-    if p < len(buf) {
-        vv = buf[p]!=0
-    }
+	if p < len(buf) {
+		vv = buf[p] != 0
+	}
 	return vs, Timestamp(ts), Ref(cs), ui, string(us), vv
 }
 
@@ -160,9 +161,9 @@ func PackLonlat(ln int64, lt int64) []byte {
 }
 
 func unpackLonlat(buf []byte) (int64, int64) {
-    if len(buf)==0 {
-        return 0,0
-    }
+	if len(buf) == 0 {
+		return 0, 0
+	}
 	a := int64(buf[0]) << 24
 	a |= int64(buf[1]) << 16
 	a |= int64(buf[2]) << 8
@@ -206,9 +207,9 @@ func PackRefSlice(nn []Ref) []byte {
 }
 
 func unpackRefs(buf []byte) []Ref {
-    if len(buf) == 0 {
-        return nil
-    }
+	if len(buf) == 0 {
+		return nil
+	}
 	l, p := utils.ReadVarint(buf, 0)
 	if l < 0 || l == 0 && len(buf) > p {
 		return nil
@@ -227,7 +228,7 @@ func unpackRefs(buf []byte) []Ref {
 }
 
 func PackMembers(mm Members) []byte {
-    
+
 	tl := 10 + 15*mm.Len()
 	for i := 0; i < mm.Len(); i++ {
 		tl += len(mm.Role(i))
@@ -236,7 +237,7 @@ func PackMembers(mm Members) []byte {
 	p := utils.WriteVarint(res, 0, int64(mm.Len())) //number of members
 	s := Ref(0)
 	for i := 0; i < mm.Len(); i++ {
-		p = utils.WriteVarint(res, p, int64(mm.MemberType(i))) 
+		p = utils.WriteVarint(res, p, int64(mm.MemberType(i)))
 		//println("p",r.ref,r.ref-s)
 		p = utils.WriteVarint(res, p, int64(mm.Ref(i)-s)) //delta packed
 		s = mm.Ref(i)
@@ -265,10 +266,10 @@ func packMembers(rms []relMember) []byte {
 }
 
 func unpackMembers(buf []byte) []relMember {
-    if len(buf) == 0 {
-        return nil
-    }
-    
+	if len(buf) == 0 {
+		return nil
+	}
+
 	l, p := utils.ReadVarint(buf, 0)
 
 	t := int64(0)
@@ -290,6 +291,7 @@ func unpackMembers(buf []byte) []relMember {
 	}
 	return ans
 }
+
 //UnpackElement deserializes the input data into a FullElement, which
 //can be converted to FullNode,FullWay,FullRelation or PackedGeometry
 //depending on the value of FullElement.Type()
@@ -312,8 +314,8 @@ func UnpackElement(buf []byte) FullElement {
 
 	var info Info
 	if in != nil {
-		a, b, c, d, e,f := unpackInfo(in)
-		info = &unpackedInfo{a, b, c, d, e,f}
+		a, b, c, d, e, f := unpackInfo(in)
+		info = &unpackedInfo{a, b, c, d, e, f}
 	}
 	var tags Tags
 	if tg != nil {

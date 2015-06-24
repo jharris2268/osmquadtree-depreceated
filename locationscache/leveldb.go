@@ -9,25 +9,24 @@ package locationscache
 
 import (
 	"encoding/binary"
-	
+
 	"github.com/jmhodges/levigo"
 
 	"path"
-	
-	"github.com/jharris2268/osmquadtree/quadtree"
+
 	"github.com/jharris2268/osmquadtree/elements"
+	"github.com/jharris2268/osmquadtree/quadtree"
 	"github.com/jharris2268/osmquadtree/utils"
 )
 
 type Cache struct {
-	db      *levigo.DB
-	cache   *levigo.Cache
-	wo      *levigo.WriteOptions
-	ro      *levigo.ReadOptions
+	db    *levigo.DB
+	cache *levigo.Cache
+	wo    *levigo.WriteOptions
+	ro    *levigo.ReadOptions
 }
 
 func (c *Cache) open(path string, create bool) error {
-	
 
 	opts := levigo.NewOptions()
 
@@ -37,8 +36,7 @@ func (c *Cache) open(path string, create bool) error {
 	opts.SetMaxOpenFiles(64)
 	opts.SetBlockRestartInterval(128)
 	opts.SetWriteBufferSize(64 * 1024 * 1024)
-	
-	
+
 	db, err := levigo.Open(path, opts)
 	if err != nil {
 		return err
@@ -87,15 +85,13 @@ func (c *Cache) Stats() string {
 }
 
 func MakeLocationsCacheLevelDb(
-        inputChans []chan elements.ExtendedBlock,
-        inputfn string, prfx string, enddate int64, state int64) error {
+	inputChans []chan elements.ExtendedBlock,
+	inputfn string, prfx string, enddate int64, state int64) error {
 
-    outch,qtm := IterObjectLocations(inputChans,32, 2)
+	outch, qtm := IterObjectLocations(inputChans, 32, 2)
 
-
-    outcache := new(Cache)
+	outcache := new(Cache)
 	outcache.open(prfx+"locationscache", true)
-
 
 	for cc := range outch {
 
@@ -129,11 +125,11 @@ func write_locsmap(cache *Cache, lm LocsMap, o int, edd int64, fstr string, stat
 	return nil
 }
 
-/*    
+/*
 func AddNewEntries(prfx string, lm LocsMap, o int, edd elements.Timestamp, fstr string, state int64) error {
 
-    
-       
+
+
 
 	cache := new(Cache)
 	err := cache.open(prfx+"locationscache", false)
@@ -141,8 +137,8 @@ func AddNewEntries(prfx string, lm LocsMap, o int, edd elements.Timestamp, fstr 
 		panic(err.Error())
 	}
 	defer cache.Close()
-    
-    
+
+
 	return write_locsmap(cache, lm, o, int64(edd), fstr, state)
 }*/
 
@@ -203,21 +199,17 @@ func get_tile(cache *Cache, k int64) ([]int64, error) {
 	return unpackTile(data), nil
 }
 
-
-
 func GetCacheSpecsLevelDb(prfx string) ([]IdxItem, []quadtree.Quadtree, error) {
 
 	cache := new(Cache)
 	err := cache.open(prfx+"locationscache", false)
 	if err != nil {
-		return nil,nil,err
+		return nil, nil, err
 	}
-    
-    
-    
+
 	defer cache.Close()
-    return getCacheSpecs(cache)
-    
+	return getCacheSpecs(cache)
+
 }
 
 func getCacheSpecs(cache *Cache) ([]IdxItem, []quadtree.Quadtree, error) {
@@ -227,33 +219,33 @@ func getCacheSpecs(cache *Cache) ([]IdxItem, []quadtree.Quadtree, error) {
 	defer it.Close()
 
 	it.Seek(kb)
-    if it.Valid() && len(it.Key())==9 {
-        it.Seek(kb[:9])
-    }
+	if it.Valid() && len(it.Key()) == 9 {
+		it.Seek(kb[:9])
+	}
 	ans := []IdxItem{}
 	qts := []quadtree.Quadtree{}
 	for it = it; it.Valid(); it.Next() {
 		item := IdxItem{}
-        if len(it.Key())==9 {
-            item.Idx = int(it.Key()[8])
-        } else {
-            item.Idx = int(it.Key()[8])<<8 | int(it.Key()[9])
-        }
+		if len(it.Key()) == 9 {
+			item.Idx = int(it.Key()[8])
+		} else {
+			item.Idx = int(it.Key()[8])<<8 | int(it.Key()[9])
+		}
 
 		//println(it.Key()[8],it.Key()[9],item.Idx)
 
 		v := it.Value()
 		if item.Idx == 65535 {
 			qtsp, _ := utils.ReadDeltaPackedList(v)
-            qts =make([]quadtree.Quadtree,len(qtsp))
-            for i,q:=range qtsp {
-                qts[i]=quadtree.Quadtree(q)
-            }
-            
+			qts = make([]quadtree.Quadtree, len(qtsp))
+			for i, q := range qtsp {
+				qts[i] = quadtree.Quadtree(q)
+			}
+
 		} else {
-			
+
 			ts, p := utils.ReadVarint(v, 0)
-            item.Timestamp = elements.Timestamp(ts)
+			item.Timestamp = elements.Timestamp(ts)
 			f := []byte{}
 			f, p = utils.ReadData(v, p)
 			item.Filename = string(f)
@@ -266,16 +258,18 @@ func getCacheSpecs(cache *Cache) ([]IdxItem, []quadtree.Quadtree, error) {
 		}
 	}
 	//println("len(ans)=",len(ans),"len(qts)=",len(qts))
-	return ans, qts,nil
+	return ans, qts, nil
 }
 
-func GetLastStateLevelDb(prfx string) (int64,error) {
-	ii, _,err := GetCacheSpecsLevelDb(prfx)
-    if err!=nil { return 0, err }
-	if len(ii) == 0 {
-		return 0,nil
+func GetLastStateLevelDb(prfx string) (int64, error) {
+	ii, _, err := GetCacheSpecsLevelDb(prfx)
+	if err != nil {
+		return 0, err
 	}
-	return ii[len(ii)-1].State,nil
+	if len(ii) == 0 {
+		return 0, nil
+	}
+	return ii[len(ii)-1].State, nil
 }
 
 func unpackTile(data []byte) []int64 {
@@ -301,12 +295,12 @@ func unpackTile(data []byte) []int64 {
 	cache := new(Cache)
 	cache.open(prfx+"locationscache", false)
 	defer cache.Close()
-    
+
     return getTiles(cache, inids)
 }*/
 
 func getTiles(cache *Cache, inids <-chan int64) LocsMap {
-    
+
 	//ans := map[int64]bool{}
 	lm := LocsMap{}
 	mm := map[int64]bool{}
@@ -336,130 +330,124 @@ func getTiles(cache *Cache, inids <-chan int64) LocsMap {
 }
 
 type levelDbLocationsCache struct {
-    cache   *Cache
-    locsMap LocsMap
-    idx     []IdxItem
+	cache   *Cache
+	locsMap LocsMap
+	idx     []IdxItem
 }
 
-func OpenLevelDbLocationsCache(prfx string) (LocationsCache,error) {
-    cache := new(Cache)
+func OpenLevelDbLocationsCache(prfx string) (LocationsCache, error) {
+	cache := new(Cache)
 	err := cache.open(prfx+"locationscache", false)
-    if err!=nil {
-        return nil, err
-    }
-    
-    idx,_,err := getCacheSpecs(cache)
-    if err!=nil {
-        cache.Close()
-        return nil,err
-    }
-    
-    return &levelDbLocationsCache{cache, nil,idx},nil
+	if err != nil {
+		return nil, err
+	}
+
+	idx, _, err := getCacheSpecs(cache)
+	if err != nil {
+		cache.Close()
+		return nil, err
+	}
+
+	return &levelDbLocationsCache{cache, nil, idx}, nil
 }
 
 func (ldlc *levelDbLocationsCache) Close() {
-    ldlc.cache.Close()
+	ldlc.cache.Close()
 }
 
 func (ldlc *levelDbLocationsCache) NumFiles() int {
-    return len(ldlc.idx)
+	return len(ldlc.idx)
 }
 
 func (ldlc *levelDbLocationsCache) FileSpec(i int) IdxItem {
-    return ldlc.idx[i]
+	return ldlc.idx[i]
 }
 
-    
+func (ldlc *levelDbLocationsCache) FindTiles(inc <-chan int64) (Locs, TilePairSet) {
+	nc := make(chan int64)
+	ll := Locs{}
 
-func (ldlc *levelDbLocationsCache) FindTiles(inc <-chan int64) (Locs,TilePairSet) {
-    nc := make(chan int64)
-    ll := Locs{}
- 
-    go func() {
-        for i := range inc {
-            ll[elements.Ref(i)] = TilePair{-1,-1}
-            nc <- i
-        }
-        close(nc)
-    }()
-    
-    lm := getTiles(ldlc.cache, nc)
-    ldlc.locsMap = lm
-    
-    tm := TilePairSet{}
-    
-    for k,_ := range ll {
-        
-        r := int64(k)
-        
-        if _,ok := lm[r/32]; ok {
-            j := lm[r/32][r % 32]
-            
-            
-            if j>0 {
-                jj :=int(j)-1
-                tp := TilePair{jj>>32, jj&0xffffffff}
-                
-                tm[tp]=true
-                ll[k] = tp
-                
-            }
-        }
-    }
-    
-    return ll,tm
+	go func() {
+		for i := range inc {
+			ll[elements.Ref(i)] = TilePair{-1, -1}
+			nc <- i
+		}
+		close(nc)
+	}()
+
+	lm := getTiles(ldlc.cache, nc)
+	ldlc.locsMap = lm
+
+	tm := TilePairSet{}
+
+	for k, _ := range ll {
+
+		r := int64(k)
+
+		if _, ok := lm[r/32]; ok {
+			j := lm[r/32][r%32]
+
+			if j > 0 {
+				jj := int(j) - 1
+				tp := TilePair{jj >> 32, jj & 0xffffffff}
+
+				tm[tp] = true
+				ll[k] = tp
+
+			}
+		}
+	}
+
+	return ll, tm
 }
 
 func (ldlc *levelDbLocationsCache) AddTiles(lcs Locs, idx IdxItem) int {
-    o := len(ldlc.idx)
-    
-    lma := LocsMap{}
-    for rf,tp := range lcs {
-        k := int64(rf)
-        v := 0
-        if tp.File!=-1 {
-            v = ((tp.File<<32) | tp.Tile) +1
-        }
-        _,ok := lma[k/32]
-        if !ok {
-            t,ok := ldlc.locsMap[k/32]
-            if !ok {
-                t = make([]int64,32)
-            }
-            lma[k/32]=t[:]
-        }
-        lma[k/32][k%32] = int64(v)
-    }
-    
-        
-    for k, v := range lma {
+	o := len(ldlc.idx)
+
+	lma := LocsMap{}
+	for rf, tp := range lcs {
+		k := int64(rf)
+		v := 0
+		if tp.File != -1 {
+			v = ((tp.File << 32) | tp.Tile) + 1
+		}
+		_, ok := lma[k/32]
+		if !ok {
+			t, ok := ldlc.locsMap[k/32]
+			if !ok {
+				t = make([]int64, 32)
+			}
+			lma[k/32] = t[:]
+		}
+		lma[k/32][k%32] = int64(v)
+	}
+
+	for k, v := range lma {
 		write_locsmap_tile(ldlc.cache, k, v, o)
 	}
-    
-    out := make_date_header(idx.Filename, int64(idx.Timestamp), idx.State)
-	ldlc.cache.db.Put(ldlc.cache.wo, idToKeyBuf(-1, o), out)
-    
-    
-    return o
-}
-    
 
-func zzGetTileQts(prfx string, inids <-chan int64) ([]string, []quadtree.Quadtree ,map[quadtree.Quadtree]bool,elements.Timestamp,error) {
-    cache := new(Cache)
+	out := make_date_header(idx.Filename, int64(idx.Timestamp), idx.State)
+	ldlc.cache.db.Put(ldlc.cache.wo, idToKeyBuf(-1, o), out)
+
+	return o
+}
+
+func zzGetTileQts(prfx string, inids <-chan int64) ([]string, []quadtree.Quadtree, map[quadtree.Quadtree]bool, elements.Timestamp, error) {
+	cache := new(Cache)
 	err := cache.open(prfx+"locationscache", false)
 	if err != nil {
-		return nil,nil,nil,0,err
+		return nil, nil, nil, 0, err
 	}
 	defer cache.Close()
-    idx,qts,err := getCacheSpecs(cache)
-    fns:=make([]string, len(idx))
-    for i,ii := range idx {
-        fns[i] = prfx+ii.Filename
-    }
-    
-    ans := map[quadtree.Quadtree]bool{}
-    
-    lm := LocsMap{}
+	idx, qts, err := getCacheSpecs(cache)
+	fns := make([]string, len(idx))
+	for i, ii := range idx {
+		fns[i] = prfx + ii.Filename
+	}
+
+	ans := map[quadtree.Quadtree]bool{}
+
+	lm := LocsMap{}
 	mm := map[int64]bool{}
 	for i := range inids {
 		if i < 0 {
@@ -478,19 +466,16 @@ func zzGetTileQts(prfx string, inids <-chan int64) ([]string, []quadtree.Quadtre
 				}
 			}
 		}
-        a := get_alloc_rb(lm,i)
-        if a>=0 {
-            ans[qts[a]]=true
-        }
+		a := get_alloc_rb(lm, i)
+		if a >= 0 {
+			ans[qts[a]] = true
+		}
 		//ans[lm[k][i-32*k]-1] = true
 	}
 	//return ans, lm
-	println(len(lm), len(mm),len(ans))
-	return fns, qts, ans,idx[len(idx)-1].Timestamp,nil
+	println(len(lm), len(mm), len(ans))
+	return fns, qts, ans, idx[len(idx)-1].Timestamp, nil
 }
-        
-        
-    
 
 func get_alloc(lm LocsMap, i int64) int64 {
 	k := i / 32
