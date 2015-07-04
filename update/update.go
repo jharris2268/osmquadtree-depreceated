@@ -239,7 +239,7 @@ func findExistingObjs(ts locationscache.TilePairSet, nfs map[int64]srcBlock,
 			}
 			sort.Sort(fps)
 
-			log.Printf("\r%-6.1f: load %8d tiles from %30s", time.Since(st).Seconds(), len(fps), ss.fn)
+			fmt.Printf("\r%-6.1f: load %8d tiles from %30s", time.Since(st).Seconds(), len(fps), ss.fn)
 			tt += len(fps)
 
 			bll, err := readfile.ReadExtendedBlockMultiSortedPartial(ss.fn, 4, fps, isc)

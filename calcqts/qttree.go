@@ -240,7 +240,7 @@ func qtTreeIterInt(qtt *qtTree, i uint32, res chan QtTreeEntry) {
 
 func FindQtTree(inchans []chan elements.ExtendedBlock, maxLevel uint) QtTree {
 	res := newQtTree(0, 2000)
-	intr := make(chan map[quadtree.Quadtree]int32)
+	intr := make(chan map[quadtree.Quadtree]int64)
 
 	go func() {
 		wg := sync.WaitGroup{}
@@ -249,7 +249,7 @@ func FindQtTree(inchans []chan elements.ExtendedBlock, maxLevel uint) QtTree {
 			go func(inc chan elements.ExtendedBlock) {
 				for bl := range inc {
 					//for each block, count number of objects with each quadtree value
-					b := map[quadtree.Quadtree]int32{}
+					b := map[quadtree.Quadtree]int64{}
 					for i := 0; i < bl.Len(); i++ {
 
 						q := bl.Element(i).(interface {
@@ -271,7 +271,7 @@ func FindQtTree(inchans []chan elements.ExtendedBlock, maxLevel uint) QtTree {
 	for bl := range intr {
 		for q, w := range bl {
 			//call AddMulti once for each quadtree value in each block
-			res.AddMulti(q.Round(maxLevel), int64(w))
+			res.AddMulti(q.Round(maxLevel), w)
 		}
 	}
 	return res
@@ -280,6 +280,7 @@ func FindQtTree(inchans []chan elements.ExtendedBlock, maxLevel uint) QtTree {
 func findGroupInt(qtt *qtTree, i uint32, mn int64, mx int64) []uint32 {
 	t := qtt.Get(i)
 
+/*
 	//look to see if all children (if any) are small
 	alls := true
 	for _, c := range t.children {
@@ -290,8 +291,10 @@ func findGroupInt(qtt *qtTree, i uint32, mn int64, mx int64) []uint32 {
 			}
 		}
 	}
-
-	//return if:
+*/
+    alls:=false
+	
+    //return if:
 	//1. has values itself
 	//2. is bigger than the minimum
 	//3. is either:

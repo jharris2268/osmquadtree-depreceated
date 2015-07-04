@@ -21,6 +21,7 @@ import (
 	"runtime/debug"
 	"sort"
 	"time"
+    
 )
 
 type psp struct {
@@ -43,6 +44,20 @@ func splitNWS(in *nodeWaySlice, sp uint) map[int]*nodeWaySlice {
 	}
 	return out
 }
+
+func addWNS(out map[int]*nodeWaySlice, sp uint, ei elements.Ref, rf elements.Refs) map[int]*nodeWaySlice {
+    
+    for i:=0; i < rf.Len(); i++ {
+        r := rf.Ref(i)
+        k := int(r>>sp)
+        if _,ok := out[k]; !ok {
+            out[k] = &nodeWaySlice{}
+        }
+        out[k].Add(r,ei)
+    }
+    return out
+}
+        
 
 func readWayNodes(infn string, nc int, tfs string, sp uint) (blocksort.AllocBlockStore, int, elements.Ref, elements.Block, error) {
 
@@ -73,7 +88,8 @@ func readWayNodes(infn string, nc int, tfs string, sp uint) (blocksort.AllocBloc
 			return nil
 		}
 
-		rp := &nodeWaySlice{}
+		//rp := &nodeWaySlice{}
+        rps := map[int]*nodeWaySlice{}
 
 		for i := 0; i < block.Len(); i++ {
 			e := block.Element(i)
@@ -90,18 +106,20 @@ func readWayNodes(infn string, nc int, tfs string, sp uint) (blocksort.AllocBloc
 				if !ok {
 					return errors.New("NO REFS")
 				}
+                rps = addWNS(rps,sp,ei, rf)
+                /*
 				for j := 0; j < rf.Len(); j++ {
 					r := rf.Ref(j)
 					rp.Add(r, ei)
 
-				}
+				}*/
 				//add rels to relation block
 			case elements.Relation:
 				rels[cc] = append(rels[cc], elements.PackedElement(e.Pack()))
 			}
 		}
 
-		rps := splitNWS(rp, sp)
+		//rps := splitNWS(rp, sp)
 
 		nn, mm := 0, 0
 		for k, v := range rps {
@@ -112,7 +130,7 @@ func readWayNodes(infn string, nc int, tfs string, sp uint) (blocksort.AllocBloc
 		}
 		//send progress message
 		prog <- psp{block.Idx(), nn, mm, block.String()}
-		rp = nil
+		//rp = nil
 		rps = nil
 		return nil
 	}
@@ -184,9 +202,9 @@ type nodeWaySlice struct {
 func (pcs *nodeWaySlice) Len() int      { return len(pcs.nw) }
 func (pcs *nodeWaySlice) Swap(i, j int) { pcs.nw[i], pcs.nw[j] = pcs.nw[j], pcs.nw[i] }
 func (pcs *nodeWaySlice) Less(i, j int) bool {
-	if pcs.nw[i].node == pcs.nw[j].node {
-		return pcs.nw[i].way < pcs.nw[j].way
-	}
+	//if pcs.nw[i].node == pcs.nw[j].node {
+	//	return pcs.nw[i].way < pcs.nw[j].way
+	//}
 	return pcs.nw[i].node < pcs.nw[j].node
 }
 
@@ -199,7 +217,7 @@ func (pcs *nodeWaySlice) Sort() {
 }
 
 func (pcs *nodeWaySlice) Pack() []byte {
-	pcs.Sort()
+	//pcs.Sort()
 
 	pk := make([]byte, 20*len(pcs.nw))
 	lnode, lway := elements.Ref(0), elements.Ref(0)
@@ -215,26 +233,112 @@ func (pcs *nodeWaySlice) Pack() []byte {
 	return pk[:p]
 }
 
-func readParentChildSliceBlockSort(abs blocksort.AllocBlockStore, mn elements.Ref, mx elements.Ref) <-chan *nodeWaySlice {
+
+type NodeWayIter interface {
+    Ok() bool
+    Ways(elements.Ref) []nodeWay
+    Clear()
+}
+
+
+type nodeWaySliceIter struct {
+    nw  []nodeWay
+    pl  int
+}
+
+
+
+func (nws *nodeWaySliceIter) Ok() bool {
+    return nws.pl < len(nws.nw)
+}
+func (nws *nodeWaySliceIter) Ways(n elements.Ref) []nodeWay {
+    for nws.pl < len(nws.nw) && n > nws.nw[nws.pl].node {
+        //fmt.Println("missing way node",nws.nw[nws.pl].node, nws.nw[nws.pl].way)
+        nws.pl++
+    }
+    pp := nws.pl
+    cc := 0
+    for pp < len(nws.nw) && n==nws.nw[pp].node {
+        cc++
+        pp++
+    }
+    ans := nws.nw[nws.pl:pp]
+    nws.pl = pp
+    /*
+    ans := make([]elements.Ref, 0, cc)
+    for nws.pl < len(nws.nw) && n==nws.nw[nws.pl].node {
+        ans=append(ans, nws.nw[nws.pl].way)
+        nws.pl++
+    }*/
+    return ans
+}
+func (nws *nodeWaySliceIter) Clear() {
+    nws.nw=nil
+}
+
+type nodeWayMapIter struct {
+    nn map[elements.Ref][]nodeWay
+    cc elements.Ref
+    ll elements.Ref
+}
+
+func (nwm *nodeWayMapIter) Ok() bool {
+    return len(nwm.nn)>0 && nwm.cc != nwm.ll
+}
+func (nwm *nodeWayMapIter) Ways(n elements.Ref) []nodeWay {
+    ans,ok := nwm.nn[n]
+    if !ok { return []nodeWay{} }
+    nwm.cc=n
+    delete(nwm.nn,n)
+    return ans
+}
+
+func (nwm *nodeWayMapIter) Clear() {
+    for k,v:=range nwm.nn {
+        for _,vi := range v {
+            fmt.Println("missed node", k, vi)
+        }
+    }
+    nwm.nn=nil
+    nwm.cc=nwm.ll
+}
+
+
+
+
+func readParentChildSliceBlockSort(abs blocksort.AllocBlockStore, mn elements.Ref, mx elements.Ref, useAlt bool) <-chan NodeWayIter {
 
 	// split reading from BlockStoreAlloc into four parallel chans
-	resp := make([]chan *nodeWaySlice, 4)
+	resp := make([]chan NodeWayIter, 4)
 	for i, _ := range resp {
-		resp[i] = make(chan *nodeWaySlice)
+		resp[i] = make(chan NodeWayIter)
 	}
 
 	add := func(i int, blob blocksort.BlockStoreAllocPair) error {
 		all := blob.Block.All()
-		tl := 0
-		for i := 0; i < all.Len(); i++ {
-			tl += numWNS2(all.At(i).Data)
-		}
-		res := &nodeWaySlice{make([]nodeWay, 0, tl)}
-		for i := 0; i < all.Len(); i++ {
-			readWNS2(res, all.At(i).Data, mn, mx)
-		}
-		res.Sort()
-		resp[blob.Idx%4] <- res
+		
+        if useAlt {
+            ans := &nodeWayMapIter{map[elements.Ref][]nodeWay{},0,0}
+            for i := 0; i < all.Len(); i++ {
+                readWNSmap(ans, all.At(i).Data,mn,mx)
+            }
+            resp[blob.Idx%4] <- ans
+        } else {
+        
+            tl := 0
+            for i := 0; i < all.Len(); i++ {
+                tl += numWNS2(all.At(i).Data)
+            }
+            res := &nodeWaySlice{make([]nodeWay, 0, tl)}
+            
+            for i := 0; i < all.Len(); i++ {
+                readWNS2(res, all.At(i).Data, mn, mx)
+            }
+            
+            res.Sort()
+            resp[blob.Idx%4] <- &nodeWaySliceIter{res.nw,0}
+        }
+        
 		blob.Block = nil
 
 		return nil
@@ -247,7 +351,7 @@ func readParentChildSliceBlockSort(abs blocksort.AllocBlockStore, mn elements.Re
 		}
 	}()
 
-	res := make(chan *nodeWaySlice)
+	res := make(chan NodeWayIter)
 	go func() {
 		//merge 4 channels into one, preserving order
 		rem := 4
@@ -287,64 +391,83 @@ func readWNS2(nws *nodeWaySlice, ss []byte, mn elements.Ref, mx elements.Ref) {
 	}
 }
 
-type nodeWayInter interface {
+func readWNSmap(nws *nodeWayMapIter, ss []byte, mn elements.Ref, mx elements.Ref) {
+	v, p := utils.ReadVarint(ss, 0)
+	x, y := elements.Ref(0), elements.Ref(0)
+	for p < len(ss) {
+		v, p = utils.ReadVarint(ss, p)
+		x += elements.Ref(v)
+		v, p = utils.ReadVarint(ss, p)
+		y += elements.Ref(v)
+		if y >= mn && y < mx {
+            if _,ok := nws.nn[x]; !ok {
+                nws.nn[x]=[]nodeWay{}
+                
+                if x > nws.ll {
+                    nws.ll=x
+                }
+            }
+            nws.nn[x]=append(nws.nn[x],nodeWay{x,y})
+        }
+	}
+}
+
+
+type nodeWayBlock interface {
 	Len() int
 	Id(int) elements.Ref
 	Lon(int) int64
 	Lat(int) int64
 	NumWays(int) int
-	Way(int, int) elements.Ref
+    Way(int,int) elements.Ref
 	Clear()
 }
 
 type nn struct {
 	id       elements.Ref
 	lon, lat int64
-	pl       int
+	ww       []nodeWay
 }
 
-type nodeWayBlock struct {
+type nodeWayBlockImpl struct {
 	nodes []nn
-	ways  []elements.Ref
+	//ways  []elements.Ref
 }
 
-func (nwb *nodeWayBlock) Len() int              { return len(nwb.nodes) }
-func (nwb *nodeWayBlock) Id(i int) elements.Ref { return nwb.nodes[i].id }
-func (nwb *nodeWayBlock) Lon(i int) int64       { return nwb.nodes[i].lon }
-func (nwb *nodeWayBlock) Lat(i int) int64       { return nwb.nodes[i].lat }
-func (nwb *nodeWayBlock) NumWays(i int) int {
-	a := nwb.nodes[i].pl
-	if (i + 1) < len(nwb.nodes) {
-		return nwb.nodes[i+1].pl - a
-	}
-	return len(nwb.ways) - a
-}
-func (nwb *nodeWayBlock) Way(i int, j int) elements.Ref {
-	return nwb.ways[nwb.nodes[i].pl+j]
-}
+func (nwb *nodeWayBlockImpl) Len() int              { return len(nwb.nodes) }
+func (nwb *nodeWayBlockImpl) Id(i int) elements.Ref { return nwb.nodes[i].id }
+func (nwb *nodeWayBlockImpl) Lon(i int) int64       { return nwb.nodes[i].lon }
+func (nwb *nodeWayBlockImpl) Lat(i int) int64       { return nwb.nodes[i].lat }
+//func (nwb *nodeWayBlockImpl) Ways(i int) []elements.Ref { return nwb.nodes[i].ww }
 
-func (nwb *nodeWayBlock) Clear() {
+func (nwb *nodeWayBlockImpl) NumWays(i int) int { return len(nwb.nodes[i].ww) }
+func (nwb *nodeWayBlockImpl) Way(i int, j int) elements.Ref { return nwb.nodes[i].ww[j].way }
+
+
+func (nwb *nodeWayBlockImpl) Clear() {
+    for _,n:=range nwb.nodes {
+        n.ww=nil
+    }
 	nwb.nodes = nil
-	nwb.ways = nil
+	
 }
 
-func mergeNodeAndWayNodesBlock(infn string, wayNodes <-chan *nodeWaySlice) <-chan nodeWayInter {
+func mergeNodeAndWayNodesBlock(infn string, wayNodes <-chan NodeWayIter) <-chan nodeWayBlock {
 
-	res := make(chan nodeWayInter)
+	res := make(chan nodeWayBlock)
 	go func() {
 		wns, ok := <-wayNodes
 
-		wnsi := 0
-		for ok && wnsi == len(wns.nw) {
+		
+		for ok && !wns.Ok() {
 			wns, ok = <-wayNodes
-			wnsi = 0
 		}
 
 		if !ok {
 			panic("NO WAYNODES")
 		}
 
-		mnn := 0
+		//mnn := 0
 		blcks, err := readfile.ReadSomeElementsMulti(infn, 4, true, false, false)
 		if err != nil {
 			panic(err.Error())
@@ -356,18 +479,8 @@ func mergeNodeAndWayNodesBlock(infn string, wayNodes <-chan *nodeWaySlice) <-cha
 				continue
 			}
 
-			nwb := &nodeWayBlock{}
+			nwb := &nodeWayBlockImpl{}
 			nwb.nodes = make([]nn, bl.Len())
-			ln := bl.Element(bl.Len() - 1).Id()
-			if ok && wns != nil && len(wns.nw) > 1 && wns.nw[len(wns.nw)-1].node > ln {
-				j := wnsi
-				for wns.nw[j].node <= ln {
-					j++
-				}
-				nwb.ways = make([]elements.Ref, 0, j-wnsi)
-			} else {
-				nwb.ways = make([]elements.Ref, 0, 4*bl.Len())
-			}
 
 			for i := 0; i < bl.Len(); i++ {
 				nn, nok := bl.Element(i).(interface {
@@ -381,49 +494,13 @@ func mergeNodeAndWayNodesBlock(infn string, wayNodes <-chan *nodeWaySlice) <-cha
 				nwb.nodes[i].id = nn.Id()
 				nwb.nodes[i].lon = nn.Lon()
 				nwb.nodes[i].lat = nn.Lat()
-				nwb.nodes[i].pl = len(nwb.ways)
-
-				if ok && (wns == nil || wnsi >= len(wns.nw)) {
-					lw := 0
-					if wns != nil {
-						lw = len(wns.nw)
-					}
-					println("WTF", mnn, wnsi, lw, nn.Id(), nn.Lon(), nn.Lat())
-					for ok && (wns == nil || wnsi == len(wns.nw)) {
-						wns = nil
-						wns, ok = <-wayNodes
-						log.Println(wns == nil, ok)
-						wnsi = 0
-					}
-				}
-
-				if ok && wns != nil && (wns.nw[wnsi].node <= nn.Id()) {
-					if wns.nw[wnsi].node < nn.Id() {
-						println("MISSING NODE", mnn, wns.nw[wnsi].node, wns.nw[wnsi].way, nn.Id(), nn.Lon(), nn.Lat())
-						mnn++
-						if mnn > 25 {
-							panic("missing nodes")
-						}
-					} else {
-						//add ways to nodeAndWays
-
-						for ok && wns.nw[wnsi].node == nn.Id() {
-							nwb.ways = append(nwb.ways, wns.nw[wnsi].way)
-
-							wnsi += 1
-
-							if wnsi == len(wns.nw) {
-								//at end, fetch next waynode block
-								for ok && wnsi == len(wns.nw) {
-									wns = nil
-									wns, ok = <-wayNodes
-									wnsi = 0
-								}
-							}
-
-						}
-					}
-				}
+                if ok {
+                    nwb.nodes[i].ww = wns.Ways(nn.Id())
+                }
+                
+                for ok && !wns.Ok() {
+                    wns,ok = <- wayNodes
+                }
 			}
 
 			res <- nwb
@@ -435,17 +512,18 @@ func mergeNodeAndWayNodesBlock(infn string, wayNodes <-chan *nodeWaySlice) <-cha
 }
 
 type nwbs interface {
-	iterBlocks(mw, Mw elements.Ref) <-chan nodeWayInter
+	iterBlocks(mw, Mw elements.Ref) <-chan nodeWayBlock
 	finish()
 }
 
 type nwbsorig struct {
 	infn string
 	abs  blocksort.AllocBlockStore
+    useAlt bool
 }
 
-func (nw *nwbsorig) iterBlocks(mw, Mw elements.Ref) <-chan nodeWayInter {
-	wayNodes := readParentChildSliceBlockSort(nw.abs, mw, Mw)
+func (nw *nwbsorig) iterBlocks(mw, Mw elements.Ref) <-chan nodeWayBlock {
+	wayNodes := readParentChildSliceBlockSort(nw.abs, mw, Mw, nw.useAlt)
 	return mergeNodeAndWayNodesBlock(nw.infn, wayNodes)
 }
 
@@ -453,9 +531,9 @@ func (nw *nwbsorig) finish() {
 	nw.abs.Finish()
 }
 
-func makeNwbs(infn string, abs blocksort.AllocBlockStore) nwbs {
+func makeNwbs(infn string, abs blocksort.AllocBlockStore, useAlt bool) nwbs {
 
-	return &nwbsorig{infn, abs}
+	return &nwbsorig{infn, abs, useAlt}
 }
 
 func expandWayBoxes(nodeWays nwbs, mw elements.Ref, Mw elements.Ref, storeType int) wayBbox {
@@ -503,6 +581,8 @@ func expandWayBoxes(nodeWays nwbs, mw elements.Ref, Mw elements.Ref, storeType i
 
 			numNode++
 			ln, lt := nwpb.Lon(i), nwpb.Lat(i)
+            //for _,w := range nwpb.Ways(i) {
+            
 			for j := 0; j < nwpb.NumWays(i); j++ {
 				w := nwpb.Way(i, j)
 				if w >= mw && w < Mw {
@@ -611,11 +691,14 @@ func findNodeQts(
 				nextP += 1952371
 			}
 			numNode++
-			numWN += nwpb.NumWays(i)
+			//numWN += nwpb.NumWays(i)
 
 			q := quadtree.Null
 			for j := 0; j < nwpb.NumWays(i); j++ {
-				q = q.Common(wayQts.Get(nwpb.Way(i, j)))
+            //for _,w := range nwpb.Ways(i) {
+            
+                q = q.Common(wayQts.Get(nwpb.Way(i, j)))
+                numWN++
 			}
 			if q < 0 {
 
@@ -741,7 +824,7 @@ func writeRelQts(
 }
 
 // Calculate a quadtree value for each entity in infn.
-func CalcObjectQts(infn string, storeType int, tfs string) (<-chan elements.ExtendedBlock, error) {
+func CalcObjectQts(infn string, storeType int, tfs string, sp uint, useAlt bool) (<-chan elements.ExtendedBlock, error) {
 
 	stt := time.Now()
 	st := time.Now()
@@ -756,11 +839,12 @@ func CalcObjectQts(infn string, storeType int, tfs string) (<-chan elements.Exte
 	if tfs == "" {
 		tfs = "tempfileslim"
 	}
-	abs, numWays, maxWay, rels, err = readWayNodes(infn, 4, tfs, 20)
+    
+    abs, numWays, maxWay, rels, err = readWayNodes(infn, 4, tfs, sp)
 	if err != nil {
 		return nil, err
 	}
-	nodeWays = makeNwbs(infn, abs)
+	nodeWays = makeNwbs(infn, abs, useAlt)
 
 	debug.FreeOSMemory()
 	if storeType == 0 && numWays > 40000000 {

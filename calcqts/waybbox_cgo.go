@@ -212,6 +212,10 @@ import (
 	"log"
 
 	"github.com/jharris2268/osmquadtree/quadtree"
+    "github.com/jharris2268/osmquadtree/elements"
+    "github.com/jharris2268/osmquadtree/read"
+    "syscall"
+    "unsafe"
 )
 
 type wayBboxTileCgo struct {
@@ -270,4 +274,175 @@ func (wbt *wayBboxTileCgo) Len() int {
 
 func newWayBboxTileCgo() wayBboxTile {
 	return &wayBboxTileCgo{C.WayBoxesInit(C.int(tileSz)), 0}
+}
+
+
+type wayBboxTileMmap struct {
+	data []byte
+	length int
+    minlon *[tileLen]int32
+    minlat *[tileLen]int32
+    maxlon *[tileLen]int32
+    maxlat *[tileLen]int32
+    newQuadtreeTileFunc func() quadtreeTile
+}
+
+
+
+
+func (wbt *wayBboxTileMmap) Expand(i int, ln int64, lt int64) bool {
+	if wbt.data == nil {
+		panic("wbt.data==nil")
+	}
+    lnn,ltt := int32(ln), int32(lt)
+    
+    isn := wbt.minlon[0]==mxInt32
+    if lnn < wbt.minlon[i] { wbt.minlon[i] = lnn }
+    if ltt < wbt.minlat[i] { wbt.minlat[i] = ltt }
+    if lnn > wbt.maxlon[i] { wbt.maxlon[i] = lnn }
+    if ltt > wbt.maxlat[i] { wbt.maxlat[i] = ltt }
+
+    if isn { wbt.length++ }
+	return isn
+}
+func (wbt *wayBboxTileMmap) Get(i int) quadtree.Bbox {
+	
+    if wbt.minlon[i] == mnInt32 {
+        return *quadtree.NullBbox()
+    }
+	return quadtree.Bbox{
+		int64(wbt.minlon[i]),
+		int64(wbt.minlat[i]),
+		int64(wbt.maxlon[i]),
+		int64(wbt.maxlat[i]),
+	}
+}
+
+
+
+func (wbt *wayBboxTileMmap) CalcQuadtree(buf float64, mxl uint) (int, quadtreeTile) {
+
+	if wbt.data == nil {
+		panic("wbt.data==nil")
+	}
+
+	ll := 0
+	res := wbt.newQuadtreeTileFunc()
+	for i := 0; i < tileLen; i++ {
+        if wbt.minlon[i]==mxInt32 {
+            continue
+        }
+        
+        bx := wbt.Get(i)
+        qt,err := quadtree.Calculate(bx, buf,mxl)
+        if err!=nil { panic(err.Error()) }
+		ll++
+        res.Set(i, qt)
+	}
+    
+	syscall.Munmap(wbt.data)
+	
+	return ll, res
+}
+
+func (wbt *wayBboxTileMmap) Len() int {
+	return wbt.length
+}
+
+func newWayBboxTileMmap(qtmmap bool) wayBboxTile {
+    res := &wayBboxTileMmap{}
+    var err error
+    res.data, err = syscall.Mmap(0,0, tileLen*4*4, syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_ANON|syscall.MAP_SHARED)
+    if err!=nil { panic(err.Error()) }
+    if len(res.data)!=tileLen*4*4 {
+        log.Panicf("?? len(mm)=%d not %d", len(res.data),tileLen*16)
+    }
+    
+    res.minlon = (*[tileLen]int32)(unsafe.Pointer(&res.data[0]))
+    res.minlat = (*[tileLen]int32)(unsafe.Pointer(&res.data[tileLen*4]))
+    res.maxlon = (*[tileLen]int32)(unsafe.Pointer(&res.data[tileLen*8]))
+    res.maxlat = (*[tileLen]int32)(unsafe.Pointer(&res.data[tileLen*12]))
+    
+    for i:=0; i < tileLen; i++ {
+        res.minlon[i] = mxInt32
+        res.minlat[i] = mxInt32
+        res.maxlon[i] = mnInt32
+        res.maxlat[i] = mnInt32
+    }        
+    if qtmmap {
+        res.newQuadtreeTileFunc = newQuadtreeTileMmap
+    } else {
+        res.newQuadtreeTileFunc = newQuadtreeTile
+    }
+    return res
+}
+
+type quadtreeTileMmap struct {
+    data []byte
+    vals *[tileLen]int64
+    length int
+}
+
+func newQuadtreeTileMmap() quadtreeTile {
+    res := &quadtreeTileMmap{}
+    var err error
+    res.data, err = syscall.Mmap(0,0, tileLen*8, syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_ANON|syscall.MAP_SHARED)
+    if err!=nil { panic(err.Error()) }
+    if len(res.data)!=tileLen*8 {
+        log.Panicf("?? len(mm)=%d not %d", len(res.data),tileLen*8)
+    }
+    res.vals = (*[tileLen]int64)(unsafe.Pointer(&res.data[0]))
+    
+	return res
+}
+
+func (qtt *quadtreeTileMmap) Get(i int) quadtree.Quadtree {
+    return quadtree.Quadtree(qtt.vals[i] - 1)
+}
+
+func (qtt *quadtreeTileMmap) Set(i int, q quadtree.Quadtree) bool {
+    
+	cv := (qtt.vals[i] == 0)
+	qtt.vals[i] = int64(q + 1)
+	if cv {
+		qtt.length++
+	}
+	return cv
+}
+
+func (qtt *quadtreeTileMmap) Expand(i int, q quadtree.Quadtree) bool {
+	cv := qtt.Get(i)
+	qtt.Set(i, q.Common(cv))
+	if cv == quadtree.Null {
+		qtt.length++
+	}
+	return cv == quadtree.Null
+}
+
+func (qtt *quadtreeTileMmap) Clear() {
+	syscall.Munmap(qtt.data)
+}
+
+func (qtt *quadtreeTileMmap) AsElements(objT elements.ElementType, off elements.Ref, first int, blckSz int) []elements.ByElementId {
+	ans := make([]elements.ByElementId, 0, qtt.length/blckSz+1)
+	curr := make(elements.ByElementId, 0, first)
+	for i:=0; i < tileLen; i++ {
+
+		if qtt.vals[i] > 0 {
+			curr = append(curr, read.MakeObjQt(objT, elements.Ref(i)+off, quadtree.Quadtree(qtt.vals[i]-1)))
+			if len(curr) == cap(curr) {
+				ans = append(ans, curr)
+				curr = make(elements.ByElementId, 0, blckSz)
+			}
+
+		}
+	}
+	if len(curr) > 0 {
+		ans = append(ans, curr)
+	}
+	return ans
+}
+
+func (qtt *quadtreeTileMmap) Len() int {
+	return qtt.length
 }

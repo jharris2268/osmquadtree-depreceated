@@ -48,9 +48,11 @@ type quadtreeTile interface {
 	AsElements(elements.ElementType, elements.Ref, int, int) []elements.ByElementId
 	Clear()
 	Len() int
+    
 }
 
 type quadtreeStoreTiled interface {
+    NumTiles() int
 	SetTile(key elements.Ref, tile quadtreeTile)
 }
 
@@ -74,12 +76,13 @@ const tileLen = 1 << 18
 var tileSz = elements.Ref(tileLen)
 
 type quadtreeTileImpl struct {
-	values []int64
+	values [tileLen]int64
 	length int
 }
 
 func newQuadtreeTile() quadtreeTile {
-	return &quadtreeTileImpl{make([]int64, tileSz), 0}
+	//return &quadtreeTileImpl{make([]int64, tileSz), 0}
+    return &quadtreeTileImpl{}
 }
 
 func (qtt *quadtreeTileImpl) Get(i int) quadtree.Quadtree {
@@ -105,7 +108,7 @@ func (qtt *quadtreeTileImpl) Expand(i int, q quadtree.Quadtree) bool {
 }
 
 func (qtt *quadtreeTileImpl) Clear() {
-	qtt.values = nil
+	//qtt.values = nil
 }
 
 func (qtt *quadtreeTileImpl) AsElements(objT elements.ElementType, off elements.Ref, first int, blckSz int) []elements.ByElementId {
@@ -290,6 +293,7 @@ func (oqi *quadtreeStoreImpl) ObjsIter(objT elements.ElementType, blckSz int) <-
 	return res
 }
 
+func (qtt *quadtreeStoreImpl) NumTiles() int { return len(qtt.tiles) }
 func (qtt *quadtreeStoreImpl) SetTile(key elements.Ref, tile quadtreeTile) {
 	if _, ok := qtt.tiles[key]; ok {
 		panic(fmt.Sprintf("tile %d already present", key))
@@ -420,8 +424,8 @@ func (wbt *wayBboxTileImpl) Expand(j int, ln, lt int64) bool {
 	if int32(lt) < wbt.minLat[j] {
 		wbt.minLat[j] = int32(lt)
 	}
-	if int32(ln) > wbt.minLat[j] {
-		wbt.minLat[j] = int32(ln)
+	if int32(ln) > wbt.maxLon[j] {
+		wbt.maxLon[j] = int32(ln)
 	}
 	if int32(lt) > wbt.maxLat[j] {
 		wbt.maxLat[j] = int32(lt)
@@ -438,6 +442,8 @@ func (wbt *wayBboxTileImpl) Get(j int) quadtree.Bbox {
 	}
 	return quadtree.Bbox{int64(wbt.minLon[j]), int64(wbt.minLat[j]), int64(wbt.maxLon[j]), int64(wbt.maxLat[j])}
 }
+
+
 
 func (wbt *wayBboxTileImpl) CalcQuadtree(buf float64, md uint) (int, quadtreeTile) {
 	ll := 0
@@ -534,6 +540,8 @@ type quadtreeTileTemp struct {
 	tile quadtreeTile
 }
 
+    
+
 func (wbi *wayBboxStoreImpl) Qts(store quadtreeStore, md uint, buf float64) quadtreeStore {
 
 	nqt := store.Len()
@@ -561,21 +569,23 @@ func (wbi *wayBboxStoreImpl) Qts(store quadtreeStore, md uint, buf float64) quad
 		}
 		close(wbc)
 	}()
+    ll:=make([]int,4)
 
 	qtc := make(chan quadtreeTileTemp)
 	go func() {
 		wg := sync.WaitGroup{}
 		wg.Add(4)
 		for s := 0; s < 4; s++ {
-			go func() {
+			go func(s int) {
 
 				for w := range wbc {
-					_, qts := w.tile.CalcQuadtree(buf, md)
+					l, qts := w.tile.CalcQuadtree(buf, md)
 					qtc <- quadtreeTileTemp{w.key, qts}
+                    ll[s]+=l
 
 				}
 				wg.Done()
-			}()
+			}(s)
 		}
 		wg.Wait()
 		close(qtc)
@@ -584,7 +594,9 @@ func (wbi *wayBboxStoreImpl) Qts(store quadtreeStore, md uint, buf float64) quad
 	for q := range qtc {
 		addTiles.SetTile(q.key, q.tile)
 	}
+    log.Println(store.Len(), nqt, addTiles.NumTiles())
 	log.Printf("calculated %d qts [%8.1fs / %8.1fs GC]\n", store.Len()-nqt, time.Since(st).Seconds(), gct)
+    log.Println(ll,ll[0]+ll[1]+ll[2]+ll[3])
 	return store
 }
 
@@ -599,6 +611,10 @@ func newWayBbox(ty int) wayBbox {
 		nt = newWayBboxTileCgo
 	case 3:
 		nt = func() wayBboxTile { return wayBboxTileMap{} }
+    case 4:
+        nt = func() wayBboxTile { return newWayBboxTileMmap(false) }
+    case 5:
+        nt = func() wayBboxTile { return newWayBboxTileMmap(true) }
 	}
 	return &wayBboxStoreImpl{map[elements.Ref]wayBboxTile{}, 0, nt}
 

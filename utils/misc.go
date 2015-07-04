@@ -24,9 +24,14 @@ import (
 	"syscall"
 )
 
+func MakeTempFile(suf string) (*os.File, error) {
+    tempdir := os.Getenv("GOPATH")
+    return ioutil.TempFile(tempdir, "osmquadtree.utils."+suf)
+}
+
 func WriteMemoryProfile() error {
-	tempdir := os.Getenv("GOPATH")
-	f, err := ioutil.TempFile(tempdir, "osmquadtree.utils.memprofile")
+	
+	f, err := MakeTempFile("memprofile")
 	if err != nil {
 		return err
 	}
