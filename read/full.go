@@ -111,6 +111,8 @@ func (r readObjsFull) readCommon(buf []byte, st []string) (elements.Ref, element
 			}
 		case 20:
 			qt = quadtree.Quadtree(utils.UnZigzag(msg.Value))
+        case 21:
+            qt,err = readQuadtree(msg.Data)
 		default:
 			rem = append(rem, msg)
 		}
@@ -257,7 +259,7 @@ func (r readObjsFull) dense(buf []byte, st []string, objs elements.ByElementId, 
 
 	ids, lns, lts, kv, qts := []int64{}, []int64{}, []int64{}, []uint64{}, []int64{}
 	infos := []elements.Info{}
-
+    var qx,qy,qz []int64
 	var err error
 	pos, msg := utils.ReadPbfTag(buf, 0)
 	for ; msg.Tag > 0; pos, msg = utils.ReadPbfTag(buf, pos) {
@@ -278,11 +280,25 @@ func (r readObjsFull) dense(buf []byte, st []string, objs elements.ByElementId, 
 			}
 		case 20:
 			qts, err = utils.ReadDeltaPackedList(msg.Data)
+        case 21:
+			qx, err = utils.ReadDeltaPackedList(msg.Data)
+        case 22:
+			qy, err = utils.ReadDeltaPackedList(msg.Data)
+        case 23:
+			qz, err = utils.ReadDeltaPackedList(msg.Data)
+        
+        
 		}
 		if err != nil {
 			return nil, err
 		}
 	}
+    if len(qts)==0 && len(qx)>0 {
+        qts,err = read_packed_quadtrees(qx,qy,qz)
+        if err!=nil { return nil,err }
+    }
+    
+    
 	kvp := 0
 	for i, id := range ids {
 		// tags: key and value in turn, elements seperated by a zero

@@ -127,10 +127,17 @@ func MakeFeatureCollection(bl elements.ExtendedBlock, asMerc bool) (map[string]i
 
 	oo := make([]interface{}, bl.Len())
 	for i, _ := range oo {
-
+        e:=bl.Element(i)
+        if e.Type()!=elements.Geometry {
+            log.Println("???", i, e)
+            continue
+        }
+            
 		o, err := geometry.ExtractGeometry(bl.Element(i))
 		if err != nil {
-			return nil, err
+            log.Println("???", i, e)
+			//return nil, err
+            continue
 		}
 
 		om, err := MakeFeature(o, asMerc)

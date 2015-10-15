@@ -1,12 +1,12 @@
-//line sql.y:6
+//line sql.y:9
 package sqlselect
 
 import __yyfmt__ "fmt"
 
-//line sql.y:6
+//line sql.y:9
 import "strings"
 
-//line sql.y:11
+//line sql.y:14
 type yySymType struct {
 	yys         int
 	empty       struct{}
@@ -143,75 +143,75 @@ var yyExca = []int{
 	-1, 1,
 	1, -1,
 	-2, 0,
-	-1, 139,
+	-1, 143,
 	34, 5,
 	55, 5,
-	-2, 48,
+	-2, 50,
 }
 
-const yyNprod = 89
+const yyNprod = 91
 const yyPrivate = 57344
 
 var yyTokenNames []string
 var yyStates []string
 
-const yyLast = 251
+const yyLast = 256
 
 var yyAct = []int{
 
-	54, 18, 16, 142, 12, 144, 17, 124, 75, 99,
-	102, 8, 32, 2, 36, 35, 56, 114, 26, 27,
-	42, 43, 44, 45, 46, 60, 61, 106, 5, 87,
-	161, 12, 88, 148, 5, 70, 136, 11, 73, 98,
-	64, 79, 63, 82, 83, 84, 85, 86, 160, 139,
-	30, 149, 53, 55, 135, 126, 122, 24, 12, 58,
-	90, 20, 21, 22, 23, 30, 5, 35, 129, 89,
-	15, 150, 80, 71, 72, 107, 61, 12, 93, 110,
-	104, 134, 14, 113, 98, 92, 109, 62, 108, 30,
-	25, 36, 35, 5, 115, 38, 41, 81, 40, 94,
-	45, 46, 67, 116, 36, 35, 20, 119, 50, 51,
-	52, 66, 131, 47, 49, 48, 145, 132, 97, 127,
-	43, 44, 45, 46, 39, 42, 43, 44, 45, 46,
-	9, 140, 138, 3, 143, 120, 130, 88, 42, 43,
-	44, 45, 46, 125, 147, 146, 76, 156, 155, 98,
-	57, 143, 157, 101, 159, 158, 38, 41, 4, 40,
-	128, 69, 100, 156, 162, 121, 34, 3, 112, 50,
-	51, 52, 28, 133, 47, 49, 48, 111, 3, 42,
-	43, 44, 45, 46, 118, 39, 42, 43, 44, 45,
-	46, 24, 4, 103, 67, 20, 21, 22, 23, 77,
-	33, 24, 78, 105, 15, 20, 21, 22, 23, 34,
-	152, 153, 24, 29, 74, 137, 14, 21, 22, 23,
-	7, 154, 151, 141, 25, 42, 43, 44, 45, 46,
-	117, 91, 59, 19, 25, 42, 43, 44, 45, 46,
-	68, 123, 37, 13, 95, 65, 96, 10, 31, 6,
-	1,
+	55, 18, 16, 146, 12, 148, 17, 128, 76, 102,
+	105, 8, 32, 61, 2, 165, 57, 36, 35, 26,
+	27, 11, 43, 44, 45, 46, 47, 118, 5, 46,
+	47, 12, 90, 164, 91, 71, 54, 56, 74, 101,
+	65, 81, 82, 64, 85, 86, 87, 88, 89, 143,
+	152, 140, 35, 30, 5, 62, 126, 72, 73, 12,
+	24, 93, 5, 109, 20, 21, 22, 23, 153, 139,
+	92, 133, 30, 15, 95, 130, 110, 62, 12, 96,
+	113, 114, 107, 63, 97, 14, 59, 112, 5, 111,
+	117, 36, 35, 25, 154, 83, 30, 119, 149, 38,
+	42, 40, 41, 120, 43, 44, 45, 46, 47, 129,
+	123, 77, 51, 52, 53, 58, 135, 48, 50, 49,
+	84, 136, 124, 131, 44, 45, 46, 47, 39, 43,
+	44, 45, 46, 47, 100, 144, 142, 20, 147, 3,
+	134, 91, 43, 44, 45, 46, 47, 138, 151, 150,
+	101, 160, 159, 36, 35, 147, 161, 68, 163, 162,
+	38, 42, 40, 41, 4, 101, 67, 160, 166, 132,
+	125, 3, 9, 51, 52, 53, 28, 34, 48, 50,
+	49, 115, 3, 43, 44, 45, 46, 47, 116, 39,
+	43, 44, 45, 46, 47, 24, 4, 106, 68, 20,
+	21, 22, 23, 70, 104, 24, 137, 108, 15, 20,
+	21, 22, 23, 103, 156, 157, 24, 33, 75, 122,
+	14, 21, 22, 23, 7, 29, 34, 78, 25, 79,
+	80, 141, 158, 155, 145, 121, 94, 60, 25, 43,
+	44, 45, 46, 47, 19, 69, 127, 37, 13, 98,
+	66, 99, 10, 31, 6, 1,
 }
 var yyPact = []int{
 
-	128, -1000, 59, 174, 128, 162, 207, -1000, 52, -1000,
-	188, 64, 143, -1000, 40, 40, -1000, -1000, 120, -1000,
-	11, -1000, -1000, -1000, -1000, -25, 32, -1000, 128, 81,
-	40, -1000, -1000, 145, -1000, 40, 40, 184, 116, 186,
-	184, 55, 184, 184, 184, 184, 184, -1000, -1000, -1000,
-	-1000, -1000, -1000, -1000, 143, -26, 82, 40, 145, 25,
-	-1000, 40, -1000, 59, 111, 141, 173, -21, -1000, -1000,
-	-1000, -1000, 26, 182, 184, -1000, 40, 116, 184, 136,
-	-1000, 151, 76, 54, 54, -1000, -1000, -1000, -1000, 28,
-	-1000, -37, -1000, 184, 51, 176, 81, 40, -1000, -1000,
-	-1000, 144, 1, 113, 0, 173, 139, -23, 13, -1000,
-	95, 184, -1000, -1000, -1000, 182, 184, -1000, 164, 46,
-	64, -1000, -1000, -1, -1000, 195, -1000, -6, -1000, -1000,
-	184, 182, 182, 184, 86, 141, 113, -4, -1000, -1000,
-	182, 34, -1000, 192, -1000, 85, 86, -1000, 195, -1000,
-	184, -1000, -1000, -1000, -7, -1000, -1000, -1000, -1000, -1000,
-	-1000, 85, -1000,
+	134, -1000, 54, 178, 134, 166, 219, -1000, 59, -1000,
+	205, 113, 147, -1000, 43, 43, -1000, -1000, 85, -1000,
+	38, -1000, -1000, -1000, -1000, 4, 28, -1000, 134, 136,
+	43, -1000, -1000, 156, -1000, 43, 43, 188, 81, 214,
+	188, 188, 78, 188, 188, 188, 188, 188, -1000, -1000,
+	-1000, -1000, -1000, -1000, -1000, 147, -23, 86, 43, 156,
+	26, -1000, 43, -1000, 54, 127, 192, 177, 15, -1000,
+	-1000, -1000, -1000, 11, 61, 188, -1000, 43, 81, 188,
+	188, 61, 140, -1000, 171, 80, -17, -17, -1000, -1000,
+	-1000, -1000, 35, -1000, -27, -1000, 188, 51, 211, 136,
+	43, -1000, -1000, -1000, 149, 1, 79, 20, 177, 148,
+	-21, 16, -1000, 61, 99, 188, -1000, -1000, -1000, 61,
+	188, -1000, 197, 112, 113, -1000, -1000, 14, -1000, 199,
+	-1000, -6, -1000, -1000, 188, 61, 61, 188, 68, 192,
+	79, 13, -1000, -1000, 61, 57, -1000, 196, -1000, 116,
+	68, -1000, 199, -1000, 188, -1000, -1000, -1000, -22, -1000,
+	-1000, -1000, -1000, -1000, -1000, 116, -1000,
 }
 var yyPgo = []int{
 
-	0, 250, 13, 249, 11, 130, 248, 9, 247, 10,
-	246, 245, 244, 37, 243, 242, 6, 0, 8, 241,
-	7, 240, 2, 233, 232, 25, 231, 230, 223, 222,
-	5, 221, 1, 3, 215,
+	0, 255, 14, 254, 11, 172, 253, 9, 252, 10,
+	251, 250, 249, 21, 248, 247, 6, 0, 8, 246,
+	7, 245, 2, 244, 237, 13, 236, 235, 234, 233,
+	5, 232, 1, 3, 231,
 }
 var yyR1 = []int{
 
@@ -219,23 +219,25 @@ var yyR1 = []int{
 	5, 8, 8, 6, 6, 6, 9, 9, 9, 9,
 	7, 7, 7, 10, 11, 11, 11, 12, 12, 13,
 	13, 13, 13, 13, 14, 14, 14, 14, 14, 14,
-	14, 15, 15, 15, 15, 15, 15, 18, 21, 34,
-	34, 17, 17, 17, 17, 17, 17, 17, 17, 17,
-	17, 23, 24, 24, 25, 26, 26, 22, 22, 16,
-	16, 16, 16, 27, 27, 28, 28, 33, 29, 29,
-	29, 30, 30, 31, 31, 19, 19, 20, 32,
+	14, 14, 14, 15, 15, 15, 15, 15, 15, 18,
+	21, 34, 34, 17, 17, 17, 17, 17, 17, 17,
+	17, 17, 17, 23, 24, 24, 25, 26, 26, 22,
+	22, 16, 16, 16, 16, 27, 27, 28, 28, 33,
+	29, 29, 29, 30, 30, 31, 31, 19, 19, 20,
+	32,
 }
 var yyR2 = []int{
 
 	0, 1, 6, 3, 4, 3, 1, 1, 1, 3,
 	2, 1, 1, 0, 1, 2, 2, 3, 5, 6,
 	0, 1, 2, 1, 1, 3, 1, 0, 2, 1,
-	3, 3, 2, 3, 3, 3, 4, 5, 6, 3,
-	4, 1, 1, 1, 1, 1, 1, 3, 3, 1,
-	3, 1, 1, 3, 3, 3, 3, 3, 3, 4,
-	1, 4, 1, 2, 4, 0, 2, 1, 3, 1,
-	1, 1, 1, 0, 3, 1, 3, 2, 0, 1,
-	1, 0, 3, 1, 3, 1, 3, 3, 1,
+	3, 3, 2, 3, 3, 3, 4, 3, 4, 5,
+	6, 3, 4, 1, 1, 1, 1, 1, 1, 3,
+	3, 1, 3, 1, 1, 3, 3, 3, 3, 3,
+	3, 4, 1, 4, 1, 2, 4, 0, 2, 1,
+	3, 1, 1, 1, 1, 0, 3, 1, 3, 2,
+	0, 1, 1, 0, 3, 1, 3, 1, 3, 3,
+	1,
 }
 var yyChk = []int{
 
@@ -243,39 +245,39 @@ var yyChk = []int{
 	-8, -13, -17, -14, 42, 30, -22, -16, -32, -23,
 	21, 22, 23, 24, 17, 50, -2, -2, 10, 6,
 	37, -6, -32, 12, 21, 41, 40, -15, 13, 42,
-	16, 14, 43, 44, 45, 46, 47, 31, 33, 32,
-	26, 27, 28, -13, -17, -13, -17, 30, 48, -24,
-	-25, 51, 55, -2, -9, -11, 30, 21, -21, -5,
-	-32, -13, -13, -17, 30, -18, 30, 13, 16, -17,
-	17, 42, -17, -17, -17, -17, -17, 55, 55, -4,
-	-32, -26, -25, 53, -13, -12, -10, 7, 38, -7,
-	21, 12, -9, 20, -2, 30, 48, -17, -4, -18,
-	-17, 41, 17, 55, 54, -17, 52, -27, 8, -9,
-	-13, 21, 55, -19, -20, 30, 55, -2, 21, 55,
-	41, -17, -17, 9, 35, 55, 37, -34, -16, 55,
-	-17, -28, -33, -17, -30, 30, -7, -20, 37, 55,
-	37, -29, 18, 19, -31, -22, -32, -30, -16, -33,
-	55, 37, -22,
+	15, 16, 14, 43, 44, 45, 46, 47, 31, 33,
+	32, 26, 27, 28, -13, -17, -13, -17, 30, 48,
+	-24, -25, 51, 55, -2, -9, -11, 30, 21, -21,
+	-5, -32, -13, -13, -17, 30, -18, 30, 13, 15,
+	16, -17, -17, 17, 42, -17, -17, -17, -17, -17,
+	55, 55, -4, -32, -26, -25, 53, -13, -12, -10,
+	7, 38, -7, 21, 12, -9, 20, -2, 30, 48,
+	-17, -4, -18, -17, -17, 41, 17, 55, 54, -17,
+	52, -27, 8, -9, -13, 21, 55, -19, -20, 30,
+	55, -2, 21, 55, 41, -17, -17, 9, 35, 55,
+	37, -34, -16, 55, -17, -28, -33, -17, -30, 30,
+	-7, -20, 37, 55, 37, -29, 18, 19, -31, -22,
+	-32, -30, -16, -33, 55, 37, -22,
 }
 var yyDef = []int{
 
 	0, -2, 1, 0, 0, 0, 0, 6, 7, 8,
-	13, 11, 12, 29, 0, 0, 51, 52, 67, 60,
-	88, 69, 70, 71, 72, 0, 0, 3, 0, 0,
-	0, 10, 14, 0, 88, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 41, 42, 43,
-	44, 45, 46, 32, 0, 0, 0, 0, 0, 65,
-	62, 0, 5, 4, 27, 20, 0, 24, 26, 9,
-	15, 30, 31, 34, 0, 35, 0, 0, 0, 0,
-	39, 0, 54, 55, 56, 57, 58, 33, 53, 0,
-	68, 0, 63, 0, 0, 73, 0, 0, 23, 16,
-	21, 0, 0, 0, 0, 0, 0, 0, 0, 36,
-	0, 0, 40, 59, 61, 66, 0, 2, 0, 0,
-	28, 22, 17, 0, 85, 0, 48, 0, 25, 47,
-	0, 37, 64, 0, 81, 20, 0, 0, 49, -2,
-	38, 74, 75, 78, 18, 0, 81, 86, 0, 87,
-	0, 77, 79, 80, 0, 83, 67, 19, 50, 76,
-	82, 0, 84,
+	13, 11, 12, 29, 0, 0, 53, 54, 69, 62,
+	90, 71, 72, 73, 74, 0, 0, 3, 0, 0,
+	0, 10, 14, 0, 90, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 43, 44,
+	45, 46, 47, 48, 32, 0, 0, 0, 0, 0,
+	67, 64, 0, 5, 4, 27, 20, 0, 24, 26,
+	9, 15, 30, 31, 34, 0, 35, 0, 0, 0,
+	0, 37, 0, 41, 0, 56, 57, 58, 59, 60,
+	33, 55, 0, 70, 0, 65, 0, 0, 75, 0,
+	0, 23, 16, 21, 0, 0, 0, 0, 0, 0,
+	0, 0, 36, 38, 0, 0, 42, 61, 63, 68,
+	0, 2, 0, 0, 28, 22, 17, 0, 87, 0,
+	50, 0, 25, 49, 0, 39, 66, 0, 83, 20,
+	0, 0, 51, -2, 40, 76, 77, 80, 18, 0,
+	83, 88, 0, 89, 0, 79, 81, 82, 0, 85,
+	69, 19, 52, 78, 84, 0, 86,
 }
 var yyTok1 = []int{
 
@@ -523,440 +525,450 @@ yydefault:
 	switch yynt {
 
 	case 1:
-		//line sql.y:97
+		//line sql.y:100
 		{
 			yylex.(*LexResult).result = yyS[yypt-0].Tabler
 			return 0
 		}
 	case 2:
-		//line sql.y:106
+		//line sql.y:109
 		{
 			yyVAL.Tabler = makeSimpleSelect(yyS[yypt-2].Tabler, yyS[yypt-4].Rowers, yyS[yypt-1].Wherer, yyS[yypt-0].orderList)
 		}
 	case 3:
-		//line sql.y:110
+		//line sql.y:113
 		{
 			yyVAL.Tabler = &unionQuery{yyS[yypt-2].Tabler, yyS[yypt-0].Tabler, "", ""}
 		}
 	case 4:
-		//line sql.y:114
+		//line sql.y:117
 		{
 			yyVAL.Tabler = &unionQuery{yyS[yypt-3].Tabler, yyS[yypt-0].Tabler, "", ""}
 		}
 	case 5:
-		//line sql.y:118
+		//line sql.y:121
 		{
 			yyVAL.Tabler = yyS[yypt-1].Tabler
 		}
 	case 6:
-		//line sql.y:125
+		//line sql.y:128
 		{
 			yyVAL.Rowers = nil
 		}
 	case 7:
-		//line sql.y:130
+		//line sql.y:133
 		{
 			yyVAL.Rowers = yyS[yypt-0].Rowers
 		}
 	case 8:
-		//line sql.y:137
+		//line sql.y:140
 		{
 			yyVAL.Rowers = rowerList{yyS[yypt-0].Rower}
 		}
 	case 9:
-		//line sql.y:141
+		//line sql.y:144
 		{
 			yyVAL.Rowers = append(yyVAL.Rowers, yyS[yypt-0].Rower)
 		}
 	case 10:
-		//line sql.y:147
+		//line sql.y:150
 		{
 			yyVAL.Rower = isAsExpr(yyS[yypt-1].Rower, yyS[yypt-0].str)
 		}
 	case 11:
-		//line sql.y:153
+		//line sql.y:156
 		{
 			yyVAL.Rower = &whereRower{yyS[yypt-0].Wherer}
 		}
 	case 12:
-		//line sql.y:157
+		//line sql.y:160
 		{
 			yyVAL.Rower = yyS[yypt-0].Rower
 		}
 	case 13:
-		//line sql.y:162
+		//line sql.y:165
 		{
 			yyVAL.str = ""
 		}
 	case 14:
-		//line sql.y:166
+		//line sql.y:169
 		{
 			yyVAL.str = yyS[yypt-0].str
 		}
 	case 15:
-		//line sql.y:170
+		//line sql.y:173
 		{
 			yyVAL.str = yyS[yypt-0].str
 		}
 	case 16:
-		//line sql.y:186
+		//line sql.y:189
 		{
 			yyVAL.Tabler = isAsTable(yyS[yypt-1].Tabler, yyS[yypt-0].str)
 		}
 	case 17:
-		//line sql.y:190
+		//line sql.y:193
 		{
 			yyVAL.Tabler = yyS[yypt-1].Tabler
 		}
 	case 18:
-		//line sql.y:194
+		//line sql.y:197
 		{
 			yyVAL.Tabler = &joinQuery{yyS[yypt-4].Tabler, yyS[yypt-2].Tabler, yyS[yypt-0].Rowers}
 		}
 	case 19:
-		//line sql.y:198
+		//line sql.y:201
 		{
 			yyVAL.Tabler = makeValuesTable(yyS[yypt-3].ValueTuples, yyS[yypt-0].Rowers)
 		}
 	case 20:
-		//line sql.y:203
+		//line sql.y:206
 		{
 			yyVAL.str = ""
 		}
 	case 21:
-		//line sql.y:207
+		//line sql.y:210
 		{
 			yyVAL.str = yyS[yypt-0].str
 		}
 	case 22:
-		//line sql.y:211
+		//line sql.y:214
 		{
 			yyVAL.str = yyS[yypt-0].str
 		}
 	case 23:
-		//line sql.y:217
+		//line sql.y:220
 		{
 			yyVAL.str = "JOIN"
 		}
 	case 24:
-		//line sql.y:224
+		//line sql.y:227
 		{
 			yyVAL.Tabler = pickTable(yyS[yypt-0].str)
 		}
 	case 25:
-		//line sql.y:228
+		//line sql.y:231
 		{
 			yyVAL.Tabler = pickTable(yyS[yypt-0].str)
 		}
 	case 26:
-		//line sql.y:232
+		//line sql.y:235
 		{
 			yyVAL.Tabler = yyS[yypt-0].Tabler
 		}
 	case 27:
-		//line sql.y:239
+		//line sql.y:242
 		{
 			yyVAL.Wherer = nil
 		}
 	case 28:
-		//line sql.y:243
+		//line sql.y:246
 		{
 			yyVAL.Wherer = yyS[yypt-0].Wherer
 		}
 	case 29:
 		yyVAL.Wherer = yyS[yypt-0].Wherer
 	case 30:
-		//line sql.y:250
+		//line sql.y:253
 		{
 			yyVAL.Wherer = &andExpr{yyS[yypt-2].Wherer, yyS[yypt-0].Wherer}
 		}
 	case 31:
-		//line sql.y:254
+		//line sql.y:257
 		{
 			yyVAL.Wherer = &orExpr{yyS[yypt-2].Wherer, yyS[yypt-0].Wherer}
 		}
 	case 32:
-		//line sql.y:258
+		//line sql.y:261
 		{
 			yyVAL.Wherer = &notExpr{yyS[yypt-0].Wherer}
 		}
 	case 33:
-		//line sql.y:262
+		//line sql.y:265
 		{
 			yyVAL.Wherer = yyS[yypt-1].Wherer
 		}
 	case 34:
-		//line sql.y:268
+		//line sql.y:271
 		{
 			yyVAL.Wherer = &compExpr{yyS[yypt-2].Rower, yyS[yypt-0].Rower, yyS[yypt-1].str}
 		}
 	case 35:
-		//line sql.y:272
+		//line sql.y:275
 		{
 			yyVAL.Wherer = &isInExpr{yyS[yypt-2].Rower, yyS[yypt-0].Rowers}
 		}
 	case 36:
-		//line sql.y:276
+		//line sql.y:279
 		{
 			yyVAL.Wherer = &notExpr{&isInExpr{yyS[yypt-3].Rower, yyS[yypt-0].Rowers}}
 		}
 	case 37:
-		//line sql.y:288
+		//line sql.y:283
+		{
+			yyVAL.Wherer = &compExpr{yyS[yypt-2].Rower, yyS[yypt-0].Rower, "LIKE"}
+		}
+	case 38:
+		//line sql.y:287
+		{
+			yyVAL.Wherer = &notExpr{&compExpr{yyS[yypt-3].Rower, yyS[yypt-0].Rower, "LIKE"}}
+		}
+	case 39:
+		//line sql.y:291
 		{
 			yyVAL.Wherer = &rangeExpr{yyS[yypt-4].Rower, yyS[yypt-2].Rower, yyS[yypt-0].Rower}
 		}
-	case 38:
-		//line sql.y:292
+	case 40:
+		//line sql.y:295
 		{
 			yyVAL.Wherer = &notExpr{&rangeExpr{yyS[yypt-5].Rower, yyS[yypt-2].Rower, yyS[yypt-0].Rower}}
 		}
-	case 39:
-		//line sql.y:296
+	case 41:
+		//line sql.y:299
 		{
 			yyVAL.Wherer = &isNullExpr{yyS[yypt-2].Rower}
 		}
-	case 40:
-		//line sql.y:300
+	case 42:
+		//line sql.y:303
 		{
 			yyVAL.Wherer = &notExpr{&isNullExpr{yyS[yypt-3].Rower}}
 		}
-	case 41:
-		//line sql.y:310
+	case 43:
+		//line sql.y:313
 		{
 			yyVAL.str = "="
 		}
-	case 42:
-		//line sql.y:314
+	case 44:
+		//line sql.y:317
 		{
 			yyVAL.str = "<"
 		}
-	case 43:
-		//line sql.y:318
+	case 45:
+		//line sql.y:321
 		{
 			yyVAL.str = ">"
 		}
-	case 44:
-		//line sql.y:322
+	case 46:
+		//line sql.y:325
 		{
 			yyVAL.str = "<="
 		}
-	case 45:
-		//line sql.y:326
+	case 47:
+		//line sql.y:329
 		{
 			yyVAL.str = ">="
 		}
-	case 46:
-		//line sql.y:330
+	case 48:
+		//line sql.y:333
 		{
 			yyVAL.str = "!="
 		}
-	case 47:
-		//line sql.y:336
+	case 49:
+		//line sql.y:339
 		{
 			yyVAL.Rowers = yyS[yypt-1].Rowers
 		}
-	case 48:
-		//line sql.y:350
+	case 50:
+		//line sql.y:353
 		{
 			yyVAL.Tabler = yyS[yypt-1].Tabler
 		}
-	case 49:
-		//line sql.y:356
+	case 51:
+		//line sql.y:359
 		{
 			yyVAL.Values = []Value{yyS[yypt-0].Value}
 		}
-	case 50:
-		//line sql.y:360
+	case 52:
+		//line sql.y:363
 		{
 			yyVAL.Values = append(yyS[yypt-2].Values, yyS[yypt-0].Value)
 		}
-	case 51:
-		//line sql.y:367
+	case 53:
+		//line sql.y:370
 		{
 			yyVAL.Rower = yyS[yypt-0].Rower
 		}
-	case 52:
-		//line sql.y:371
+	case 54:
+		//line sql.y:374
 		{
 			yyVAL.Rower = &valRow{"", yyS[yypt-0].Value}
 		}
-	case 53:
-		//line sql.y:375
+	case 55:
+		//line sql.y:378
 		{
 			yyVAL.Rower = yyS[yypt-1].Rower
 		}
-	case 54:
-		//line sql.y:387
+	case 56:
+		//line sql.y:390
 		{
 			yyVAL.Rower = &concatExpr{yyS[yypt-2].Rower, yyS[yypt-0].Rower}
 		}
-	case 55:
-		//line sql.y:395
+	case 57:
+		//line sql.y:398
 		{
 			yyVAL.Rower = &mathExpr{yyS[yypt-2].Rower, yyS[yypt-0].Rower, "+"}
 		}
-	case 56:
-		//line sql.y:399
+	case 58:
+		//line sql.y:402
 		{
 			yyVAL.Rower = &mathExpr{yyS[yypt-2].Rower, yyS[yypt-0].Rower, "-"}
 		}
-	case 57:
-		//line sql.y:403
+	case 59:
+		//line sql.y:406
 		{
 			yyVAL.Rower = &mathExpr{yyS[yypt-2].Rower, yyS[yypt-0].Rower, "*"}
 		}
-	case 58:
-		//line sql.y:407
+	case 60:
+		//line sql.y:410
 		{
 			yyVAL.Rower = &mathExpr{yyS[yypt-2].Rower, yyS[yypt-0].Rower, "/"}
 		}
-	case 59:
-		//line sql.y:442
+	case 61:
+		//line sql.y:445
 		{
 			yyVAL.Rower = &funcExpr{yyS[yypt-3].str, yyS[yypt-1].Rowers}
 		}
-	case 60:
-		//line sql.y:446
+	case 62:
+		//line sql.y:449
 		{
 			yyVAL.Rower = yyS[yypt-0].caseRower
 		}
-	case 61:
-		//line sql.y:476
+	case 63:
+		//line sql.y:479
 		{
 			yyVAL.caseRower = &caseRower{yyS[yypt-2].whens, yyS[yypt-1].Rower}
 		}
-	case 62:
-		//line sql.y:492
+	case 64:
+		//line sql.y:495
 		{
 			yyVAL.whens = []exPair{yyS[yypt-0].when}
 		}
-	case 63:
-		//line sql.y:496
+	case 65:
+		//line sql.y:499
 		{
 			yyVAL.whens = append(yyS[yypt-1].whens, yyS[yypt-0].when)
 		}
-	case 64:
-		//line sql.y:502
+	case 66:
+		//line sql.y:505
 		{
 			yyVAL.when = exPair{yyS[yypt-2].Wherer, yyS[yypt-0].Rower}
 		}
-	case 65:
-		//line sql.y:507
+	case 67:
+		//line sql.y:510
 		{
 			yyVAL.Rower = nil
 		}
-	case 66:
-		//line sql.y:511
+	case 68:
+		//line sql.y:514
 		{
 			yyVAL.Rower = yyS[yypt-0].Rower
 		}
-	case 67:
-		//line sql.y:517
+	case 69:
+		//line sql.y:520
 		{
 			yyVAL.Rower = pickRow(yyS[yypt-0].str)
 		}
-	case 68:
-		//line sql.y:521
+	case 70:
+		//line sql.y:524
 		{
 			yyVAL.Rower = pickRow(yyS[yypt-2].str) //&ColName{Qualifier: $1, Name: $3}
 		}
-	case 69:
-		//line sql.y:527
+	case 71:
+		//line sql.y:530
 		{
 			yyVAL.Value = stringValue(yyS[yypt-0].str)
 		}
-	case 70:
-		//line sql.y:531
-		{
-			yyVAL.Value = makeNumVal(yyS[yypt-0].str)
-		}
-	case 71:
-		//line sql.y:535
-		{
-			yyVAL.Value = makeNumVal(yyS[yypt-0].str)
-		}
 	case 72:
-		//line sql.y:539
+		//line sql.y:534
+		{
+			yyVAL.Value = makeNumVal(yyS[yypt-0].str)
+		}
+	case 73:
+		//line sql.y:538
+		{
+			yyVAL.Value = makeNumVal(yyS[yypt-0].str)
+		}
+	case 74:
+		//line sql.y:542
 		{
 			yyVAL.Value = nullValue()
 		}
-	case 73:
-		//line sql.y:545
+	case 75:
+		//line sql.y:548
 		{
 			yyVAL.orderList = nil
 		}
-	case 74:
-		//line sql.y:549
+	case 76:
+		//line sql.y:552
 		{
 			yyVAL.orderList = yyS[yypt-0].orderList
 		}
-	case 75:
-		//line sql.y:555
+	case 77:
+		//line sql.y:558
 		{
 			yyVAL.orderList = orderList{yyS[yypt-0].order}
 		}
-	case 76:
-		//line sql.y:559
+	case 78:
+		//line sql.y:562
 		{
 			yyVAL.orderList = append(yyS[yypt-2].orderList, yyS[yypt-0].order)
 		}
-	case 77:
-		//line sql.y:565
+	case 79:
+		//line sql.y:568
 		{
 			yyVAL.order = order{yyS[yypt-1].Rower, yyS[yypt-0].str}
 		}
-	case 78:
-		//line sql.y:570
-		{
-			yyVAL.str = "ASC"
-		}
-	case 79:
-		//line sql.y:574
-		{
-			yyVAL.str = "ASC"
-		}
 	case 80:
-		//line sql.y:578
+		//line sql.y:573
+		{
+			yyVAL.str = "ASC"
+		}
+	case 81:
+		//line sql.y:577
+		{
+			yyVAL.str = "ASC"
+		}
+	case 82:
+		//line sql.y:581
 		{
 			yyVAL.str = "DESC"
 		}
-	case 81:
-		//line sql.y:584
+	case 83:
+		//line sql.y:587
 		{
 			yyVAL.Rowers = nil
 		}
-	case 82:
-		//line sql.y:588
+	case 84:
+		//line sql.y:591
 		{
 			yyVAL.Rowers = yyS[yypt-1].Rowers
 		}
-	case 83:
-		//line sql.y:594
+	case 85:
+		//line sql.y:597
 		{
 			yyVAL.Rowers = []Rower{yyS[yypt-0].Rower}
 		}
-	case 84:
-		//line sql.y:598
+	case 86:
+		//line sql.y:601
 		{
 			yyVAL.Rowers = append(yyVAL.Rowers, yyS[yypt-0].Rower)
 		}
-	case 85:
-		//line sql.y:605
+	case 87:
+		//line sql.y:608
 		{
 			yyVAL.ValueTuples = [][]Value{yyS[yypt-0].Values}
 		}
-	case 86:
-		//line sql.y:609
+	case 88:
+		//line sql.y:612
 		{
 			yyVAL.ValueTuples = append(yyS[yypt-2].ValueTuples, yyS[yypt-0].Values)
 		}
-	case 87:
-		//line sql.y:615
+	case 89:
+		//line sql.y:618
 		{
 			yyVAL.Values = []Value(yyS[yypt-1].Values)
 		}
-	case 88:
-		//line sql.y:626
+	case 90:
+		//line sql.y:629
 		{
 			yyVAL.str = strings.ToLower(yyS[yypt-0].str)
 		}

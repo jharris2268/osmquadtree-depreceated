@@ -48,8 +48,36 @@ func (bo ByElementId) Less(i, j int) bool {
 	return Less(bo[i], bo[j])
 }
 
+func compGeom(l Element, r Element) bool {
+    lfe,ok := l.(FullElement)
+    if ok {
+        rfe,ok := r.(FullElement)
+        if ok {
+            return compTags(lfe.Tags(), rfe.Tags())
+        }
+    }
+    return string(l.Pack()) < string(r.Pack())
+}
+
+func compTags(lt Tags, rt Tags) bool {
+    mm := lt.Len()
+    if rt.Len() < mm { mm = rt.Len() }
+    for i:=0; i < mm; i++ {
+        if lt.Key(i) != rt.Key(i) {
+            return lt.Key(i) < rt.Key(i)
+        }
+        if lt.Value(i) != rt.Value(i) {
+            return lt.Value(i) < rt.Value(i)
+        }
+    }
+    return false
+}
+
 func Less(l Element, r Element) bool {
 	if l.Type() == r.Type() {
+        if l.Type() == Geometry && l.Id()==r.Id() {
+            return compGeom(l, r)
+        }
 		return l.Id() < r.Id()
 	}
 	return l.Type() < r.Type()

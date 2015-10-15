@@ -16,6 +16,7 @@ import (
 
 	"fmt"
 	"math"
+    "sort"
 )
 
 type BlockStore interface {
@@ -30,8 +31,8 @@ func MakeBlockStore() BlockStore {
 
 type PackedDataStore interface {
 	AddBlock(elements.ExtendedBlock)
-	Filter(quadtree.Bbox, geometry.GeometryType, []string) sqlselect.Result
-
+	Filter(quadtree.Bbox, geometry.GeometryType, []string, int) sqlselect.Result
+    FilterTile(quadtree.Quadtree, geometry.GeometryType, []string, int) sqlselect.Result
 	Keys() quadtree.QuadtreeSlice
 	ByKey(q quadtree.Quadtree) elements.Block
 }
@@ -285,6 +286,29 @@ func (frs *filtRowSlice) Columns() []sqlselect.Rower {
 	return r
 }
 
+func (frs *filtRowSlice) sortBy(col int) {
+    sort.Sort(&sortSlice{frs, col})
+}
+
+type sortSlice struct {
+    frs *filtRowSlice
+    col int
+}
+
+func (ss *sortSlice) Len() int { return ss.frs.Len() }
+func (ss *sortSlice) Swap(i,j int) {
+    
+    for k,_ := range ss.frs.cols {
+        ss.frs.vals[i*len(ss.frs.cols) + k], ss.frs.vals[j*len(ss.frs.cols) + k] = ss.frs.vals[j*len(ss.frs.cols) + k], ss.frs.vals[i*len(ss.frs.cols) + k]
+    }
+}
+
+func (ss *sortSlice) Less(i,j int) bool {
+    return ss.frs.vals[i*len(ss.frs.cols) + ss.col].Less(ss.frs.vals[j*len(ss.frs.cols)+ss.col])
+}
+        
+
+
 type filtRow struct {
 	i   int
 	frs *filtRowSlice
@@ -310,7 +334,52 @@ func rowString(rw sqlselect.Row) string {
 	return r
 }
 
-func (pdsi *packedDataStoreImpl) Filter(bb quadtree.Bbox, gt geometry.GeometryType, cols []string) sqlselect.Result {
+func (pdsi *packedDataStoreImpl) make_obj(o objRow, cols []string) []sqlselect.Value {
+    r := make([]sqlselect.Value, len(cols))
+
+    gd := pdsi.blockstore.Get(o.data)
+    pg, ok := elements.UnpackElement(gd).(elements.PackedGeometry)
+    if !ok {
+        log.Println("?? not a geometry", elements.PackedElement(gd))
+        return nil
+    }
+
+    zo, ar, _ := geometry.ReadGeometryZOrderWayArea(pg.GeometryData())
+
+    vs := readObjTags(pdsi.blockstore.Get(o.tags), pdsi.commonstrs)
+
+    for i, c := range cols {
+        switch c {
+        case "osm_id":
+
+            oi := int64(pg.Id()) & 0xffffffffffff
+            if (pg.Id() >> 59) == 2 {
+                oi *= -1
+            }
+            r[i] = sqlselect.IntValue(oi)
+
+        case "way":
+            r[i] = sqlselect.GeomValue(pg.GeometryData())
+        case "z_order":
+            r[i] = sqlselect.IntValue(zo)
+        case "way_area":
+            r[i] = sqlselect.FloatValue(ar)
+        case "quadtree":
+            r[i] = sqlselect.IntValue(int64(pg.Quadtree()))
+
+        default:
+            s, ok := vs[c]
+            if ok {
+                r[i] = sqlselect.StringValue(s)
+            } else {
+                r[i] = &sqlselect.NullValue{}
+            }
+        }
+    }
+    return r
+}
+
+func (pdsi *packedDataStoreImpl) Filter(bb quadtree.Bbox, gt geometry.GeometryType, cols []string, sortby int) sqlselect.Result {
 	rs := make([]sqlselect.Value, 0, 1000)
 	cm := map[string]int{}
 	for i, c := range cols {
@@ -340,53 +409,56 @@ func (pdsi *packedDataStoreImpl) Filter(bb quadtree.Bbox, gt geometry.GeometryTy
 			if !ob.Intersects(bb) {
 				continue
 			}
-
-			r := make([]sqlselect.Value, len(cols))
-
-			gd := pdsi.blockstore.Get(o.data)
-			pg, ok := elements.UnpackElement(gd).(elements.PackedGeometry)
-			if !ok {
-				log.Println("?? not a geometry", elements.PackedElement(gd))
-				continue
-			}
-
-			zo, ar, _ := geometry.ReadGeometryZOrderWayArea(pg.GeometryData())
-
-			vs := readObjTags(pdsi.blockstore.Get(o.tags), pdsi.commonstrs)
-
-			for i, c := range cols {
-				switch c {
-				case "osm_id":
-
-					oi := int64(pg.Id()) & 0xffffffffffff
-					if (pg.Id() >> 59) == 2 {
-						oi *= -1
-					}
-					r[i] = sqlselect.IntValue(oi)
-
-				case "way":
-					r[i] = sqlselect.GeomValue(pg.GeometryData())
-				case "z_order":
-					r[i] = sqlselect.IntValue(zo)
-				case "way_area":
-					r[i] = sqlselect.FloatValue(ar)
-				case "quadtree":
-					r[i] = sqlselect.IntValue(int64(pg.Quadtree()))
-
-				default:
-					s, ok := vs[c]
-					if ok {
-						r[i] = sqlselect.StringValue(s)
-					} else {
-						r[i] = &sqlselect.NullValue{}
-					}
-				}
-			}
-			rs = append(rs, r...)
+            r := pdsi.make_obj(o, cols)
+            if r!=nil {           
+			
+                rs = append(rs, r...)
+            }
 		}
 	}
 	ss := &filtRowSlice{cols, cm, rs}
+    if sortby != -1 {
+        ss.sortBy(sortby)
+    }
+    
+	return ss
+}
 
+
+func (pdsi *packedDataStoreImpl) FilterTile(qt quadtree.Quadtree, gt geometry.GeometryType, cols []string, sortby int) sqlselect.Result {
+	rs := make([]sqlselect.Value, 0, 1000)
+	cm := map[string]int{}
+	for i, c := range cols {
+		cm[c] = i
+	}
+
+	var objs map[quadtree.Quadtree][]objRow
+	switch gt {
+	case geometry.Point:
+		objs = pdsi.point
+	case geometry.Linestring:
+		objs = pdsi.line
+	case geometry.Polygon:
+		objs = pdsi.polygon
+	}
+	if objs == nil {
+		return nil
+	}
+    
+    v,ok := objs[qt]
+    if ok {
+        
+        for _, o := range v {
+			r := pdsi.make_obj(o, cols)
+            if r!=nil {
+                rs = append(rs, r...)
+            }
+		}
+	}
+	ss := &filtRowSlice{cols, cm, rs}
+    if sortby != -1 {
+        ss.sortBy(sortby)
+    }
 	return ss
 }
 

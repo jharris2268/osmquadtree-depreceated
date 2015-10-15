@@ -25,6 +25,8 @@ func init_hworder() {
 	hworder["footpath"] = 1
 	hworder["cycleway"] = 1
 	hworder["bridlepath"] = 1
+    hworder["living_street"] = 2
+    hworder["pedestrian"] = 2
 	hworder["residential"] = 3
 	hworder["unclassified"] = 3
 	hworder["road"] = 3
@@ -253,7 +255,7 @@ func FindParentHighway(highways []string) string {
 	}
 	for _, p := range highways {
 		s, ok := hworder[p]
-		if ok && (s > sc || (s == sc && strings.HasSuffix(mv, "link"))) {
+		if ok && (s > sc || (s == sc && strings.HasSuffix(mv, "link")) || (s==sc && p < mv)) {                
 			mv = p
 			sc = s
 		}
@@ -267,7 +269,7 @@ func FindParentHighway(highways []string) string {
 		for k, v := range ppm {
 			if v > maxm {
 				mv = k
-			}
+			} 
 		}
 		//if len(ppm) > 1 {
 		//	log.Println("pick", mv, "from", ppm)

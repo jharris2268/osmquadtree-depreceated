@@ -33,6 +33,20 @@ const (
 	Multi
 )
 
+func (gt GeometryType) String() string {
+    switch gt {
+        case NullGeometry: return "Null"
+        case Point: return "Point"
+        case Linestring: return "Linestring"
+        case Polygon: return "Polygon"
+        case MultiPoint: return "MultiPoint"
+        case MultiLinestring: return "MultiLinestring"
+        case MultiPolygon: return "MultiPolygon"
+        case Multi: return "Multi"
+    }
+    return "??"
+}
+
 var UnrecognisedGeometryError = errors.New("Unrecognised Geometry Type")
 
 type Coord interface {
@@ -222,15 +236,15 @@ func GenerateGeometries(
 	}
 	var D <-chan elements.ExtendedBlock
 	if _, ok := tagsFilter["min_admin_level"]; ok {
-
-		D = AddRelationRange(C, hasTags(map[string]string{"boundary": "adminstrative", "type": "boundary"}), "admin_level", AdminLevels)
+        //println("AddRelationRange min_admin_level ...")
+		D = AddRelationRange(C, hasTags(map[string]string{"boundary": "administrative", "type": "boundary"}), "admin_level", AdminLevels)
 	} else {
 		println("skip admin_level")
 		D = C
 	}
 	var D2 <-chan elements.ExtendedBlock
 	if _, ok := tagsFilter["bus_routes"]; ok {
-
+        //println("AddRelationRange bus_routes ...")
 		D2 = AddRelationRange(D, hasTags(map[string]string{"type": "route", "route": "bus"}), "ref", RouteList("bus_routes").Proc)
 	} else {
 		println("skip bus_routes")
@@ -243,7 +257,7 @@ func GenerateGeometries(
 		D3 = AddRelationRange(D2, hasTags(map[string]string{"type": "route", "route": "bicycle"}), "network", RouteList("cycle_routes").Proc)
 	} else {
 		println("skip cycle_routes")
-		D3 = D
+		D3 = D2
 	}
 
 	E := MakeGeometries(D3, tagsFilter)

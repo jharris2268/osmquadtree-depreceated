@@ -16,23 +16,35 @@ import (
 //only read element id, quadtree and changetype
 
 type nodeqt struct {
-	ref, qt int64
-	ct      byte
+	//ref, qt int64
+    //ct      byte
+    ref     elements.Ref
+    qt      quadtree.Quadtree
+    ct      elements.ChangeType
 }
 
 type wayqt struct {
-	ref, qt int64
-	ct      byte
+	//ref, qt int64
+    //ct      byte
+    ref     elements.Ref
+    qt      quadtree.Quadtree
+    ct      elements.ChangeType
 }
 
 type relqt struct {
-	ref, qt int64
-	ct      byte
+	//ref, qt int64
+    //ct      byte
+    ref     elements.Ref
+    qt      quadtree.Quadtree
+    ct      elements.ChangeType
 }
 
 type geomqt struct {
-	ref, qt int64
-	ct      byte
+	//ref, qt int64
+    //ct      byte
+    ref     elements.Ref
+    qt      quadtree.Quadtree
+    ct      elements.ChangeType
 }
 
 func (r *nodeqt) Type() elements.ElementType      { return elements.Node }
@@ -78,13 +90,13 @@ func (r *geomqt) Quadtree() quadtree.Quadtree { return quadtree.Quadtree(r.qt) }
 func MakeObjQt(ty elements.ElementType, ref elements.Ref, qt quadtree.Quadtree) elements.Element {
 	switch ty {
 	case elements.Node:
-		return &nodeqt{int64(ref), int64(qt), 0}
+		return &nodeqt{ref,qt, 0}
 	case elements.Way:
-		return &wayqt{int64(ref), int64(qt), 0}
+		return &wayqt{ref,qt, 0}
 	case elements.Relation:
-		return &relqt{int64(ref), int64(qt), 0}
+		return &relqt{ref,qt, 0}
 	case elements.Geometry:
-		return &geomqt{int64(ref), int64(qt), 0}
+		return &geomqt{ref,qt, 0}
 	}
 	return nil
 }
@@ -93,48 +105,113 @@ type readObjsRefqt struct{}
 
 func (rorq readObjsRefqt) addType(e elements.ElementType) bool { return true }
 
+func find_id_and_qt(buf []byte) (elements.Ref, quadtree.Quadtree, error) {
+    var id elements.Ref
+    var qt quadtree.Quadtree
+    idok,qtok := false,false
+    var err error
+    pos, msg := utils.ReadPbfTag(buf, 0)
+    for ; ((msg.Tag > 0) && !idok && !qtok); pos, msg = utils.ReadPbfTag(buf, pos) {
+        switch msg.Tag {
+            case 1:
+                id = elements.Ref(msg.Value)
+                idok = true
+            case 20:
+                qt = quadtree.Quadtree(utils.UnZigzag(msg.Value))
+                qtok = true
+            case 21:
+                qt,err = readQuadtree(msg.Data)
+                if err!=nil {
+                    return id,qt,err
+                }
+                qtok = true
+        }
+    }
+    if !idok || !qtok {
+        fmt.Println("??",id,qt)
+        return id,qt,missingData
+    }
+    return id,qt,nil
+}
+
 func (readObjsRefqt) node(buf []byte, st []string, ct elements.ChangeType) (elements.Element, error) {
+    id,qt,err := find_id_and_qt(buf)
+    if err!=nil { return nil, err }
+    return &nodeqt{id,qt,ct}, nil
+    
+    /*
 	a, ok := getV(buf, 1)
 	if !ok {
 		return nil, missingData
 	}
 	b, ok := getV(buf, 20)
+    
 
-	return &nodeqt{int64(a), utils.UnZigzag(b), byte(ct)}, nil
+	return &nodeqt{int64(a), utils.UnZigzag(b), byte(ct)}, nil*/
 }
 
 func (readObjsRefqt) way(buf []byte, st []string, ct elements.ChangeType) (elements.Element, error) {
+    id,qt,err := find_id_and_qt(buf)
+    if err!=nil { return nil, err }
+    return &wayqt{id,qt,ct}, nil
+    /*
 	a, ok := getV(buf, 1)
 	if !ok {
 		return nil, missingData
 	}
 	b, ok := getV(buf, 20)
 
-	return &wayqt{int64(a), utils.UnZigzag(b), byte(ct)}, nil
+	return &wayqt{int64(a), utils.UnZigzag(b), byte(ct)}, nil*/
 }
 
 func (readObjsRefqt) relation(buf []byte, st []string, ct elements.ChangeType) (elements.Element, error) {
+    id,qt,err := find_id_and_qt(buf)
+    if err!=nil { return nil, err }
+    return &relqt{id,qt,ct}, nil
+    /*
 	a, ok := getV(buf, 1)
 	if !ok {
 		return nil, missingData
 	}
 	b, ok := getV(buf, 20)
 
-	return &relqt{int64(a), utils.UnZigzag(b), byte(ct)}, nil
+	return &relqt{int64(a), utils.UnZigzag(b), byte(ct)}, nil*/
 }
 
 func (readObjsRefqt) geometry(buf []byte, st []string, ct elements.ChangeType) (elements.Element, error) {
-	a, ok := getV(buf, 1)
+    id,qt,err := find_id_and_qt(buf)
+    if err!=nil { return nil, err }
+    return &geomqt{id,qt,ct}, nil
+	
+    /*a, ok := getV(buf, 1)
 	if !ok {
 		return nil, missingData
 	}
 	b, ok := getV(buf, 20)
 
-	return &geomqt{int64(a), utils.UnZigzag(b), byte(ct)}, nil
+	return &geomqt{int64(a), utils.UnZigzag(b), byte(ct)}, nil*/
+}
+
+func read_packed_quadtrees(qx, qy, qz []int64) ([]int64, error) {
+    
+    if (len(qx)!=len(qy) || len(qx)!=len(qz)) {
+        return nil, missingData
+    }
+    qq := make([]int64, len(qx))
+    for i,x := range qx {
+        qt,err := quadtree.FromTuple(x,qy[i],qz[i])
+        if err!=nil { return nil,err }
+        qq[i] = int64(qt)
+    }
+    /*q:=quadtree.Quadtree(qq[0])
+    s,t,u:=q.Tuple()
+    fmt.Println(qx[0],qy[0],qz[0],len(qx),len(qq),s,t,u,q)*/
+    return qq,nil
 }
 
 func (readObjsRefqt) dense(buf []byte, st []string, objs elements.ByElementId, ct elements.ChangeType) (elements.ByElementId, error) {
 	var ii, qq []int64
+    var qx,qy,qz []int64
 
 	var err error
 	pos, msg := utils.ReadPbfTag(buf, 0)
@@ -143,19 +220,31 @@ func (readObjsRefqt) dense(buf []byte, st []string, objs elements.ByElementId, c
 		case 1:
 			ii, err = utils.ReadDeltaPackedList(msg.Data)
 		case 20:
-			qq, err = utils.ReadDeltaPackedList(msg.Data)
-		}
+			qq, err = utils.ReadDeltaPackedList(msg.Data) //depreceated
+		
+        case 21:
+            qx, err = utils.ReadDeltaPackedList(msg.Data)
+        case 22:
+            qy, err = utils.ReadDeltaPackedList(msg.Data)
+        case 23:
+            qz, err = utils.ReadDeltaPackedList(msg.Data)
 
+        }
 		if err != nil {
 			return nil, err
 		}
 
 	}
+    if (len(qq) == 0) && (len(qx)>0) {
+        qq,err = read_packed_quadtrees(qx,qy,qz)
+        if err!=nil { return nil, err }
+    }
+    
 	for i, id := range ii {
 		if i >= len(qq) {
 			return nil, missingData
 		}
-		objs = append(objs, &nodeqt{id, qq[i], byte(ct)})
+		objs = append(objs, &nodeqt{elements.Ref(id), quadtree.Quadtree(qq[i]), ct})
 
 	}
 	return objs, nil
@@ -164,10 +253,13 @@ func (readObjsRefqt) dense(buf []byte, st []string, objs elements.ByElementId, c
 // ReadQts reutrns an ExtendedBlock of elements consiting of the Type,
 // Ref and Quadtree only. This is used by the calcqts.FindGroups function.
 func ReadQts(idx int, buf []byte, isc bool) (elements.ExtendedBlock, error) {
-
+    //fmt.Println("ReadQts",idx,len(buf))
 	qt, bl, err := readPlain(buf, readObjsRefqt{}, isc)
+    
 	if err != nil {
+        fmt.Println("ReadQts",idx,len(buf),err.Error())
 		return nil, err
 	}
+    //fmt.Println(qt,bl)
 	return elements.MakeExtendedBlock(idx, bl, qt, 0, 0, nil), nil
 }

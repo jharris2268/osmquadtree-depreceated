@@ -16,16 +16,19 @@ import (
 //read element id, quadtree and data: location, nodes or members as appropiate
 
 type nodeloc struct {
-	ref, qt  int64
+	ref     elements.Ref
+    qt      quadtree.Quadtree
 	lon, lat int64
 }
 
 type wayrefs struct {
-	ref, qt int64
+	ref     elements.Ref
+    qt      quadtree.Quadtree
 	rr      []int64
 }
 type relmems struct {
-	ref, qt int64
+	ref     elements.Ref
+    qt      quadtree.Quadtree
 	tt      []uint64
 	rr      []int64
 }
@@ -93,72 +96,87 @@ func (rorq readObjsData) addType(e elements.ElementType) bool {
 }
 
 func (readObjsData) node(buf []byte, st []string, ct elements.ChangeType) (elements.Element, error) {
-	a, b, c, d := int64(0), int64(-1), int64(0), int64(0)
+	id,qt,ln,lt := elements.Ref(0), quadtree.Null, int64(0), int64(0)
+    var err error
 	pos, msg := utils.ReadPbfTag(buf, 0)
 	for ; msg.Tag > 0; pos, msg = utils.ReadPbfTag(buf, pos) {
 		switch msg.Tag {
 		//ignore info and tags
 		case 1:
-			a = int64(msg.Value)
+			id = elements.Ref(msg.Value)
 		case 8:
-			d = utils.UnZigzag(msg.Value)
+			lt = utils.UnZigzag(msg.Value)
 		case 9:
-			c = utils.UnZigzag(msg.Value)
+			ln = utils.UnZigzag(msg.Value)
 		case 20:
-			b = utils.UnZigzag(msg.Value)
+			qt = quadtree.Quadtree(utils.UnZigzag(msg.Value))
+        case 21:
+            qt,err = readQuadtree(msg.Data)
+            if err!=nil { return nil,err }
 		}
+        
 	}
-	return &nodeloc{a, b, c, d}, nil
+	return &nodeloc{id,qt,ln,lt}, nil
 
 }
 
 func (readObjsData) way(buf []byte, st []string, ct elements.ChangeType) (elements.Element, error) {
-	a, b := int64(0), int64(-1)
-	var c []int64
-
+	id, qt := elements.Ref(0), quadtree.Null
+	var rfs []int64
+    var err error
 	pos, msg := utils.ReadPbfTag(buf, 0)
 	for ; msg.Tag > 0; pos, msg = utils.ReadPbfTag(buf, pos) {
 		switch msg.Tag {
 		//ignore info and tags
 		case 1:
-			a = int64(msg.Value)
+			id = elements.Ref(msg.Value)
 		case 8:
-			c, _ = utils.ReadDeltaPackedList(msg.Data)
+			rfs,err = utils.ReadDeltaPackedList(msg.Data)
+            if err!=nil { return nil,err}
 		case 20:
-			b = utils.UnZigzag(msg.Value)
+			qt = quadtree.Quadtree(utils.UnZigzag(msg.Value))
+        case 21:
+            qt,err = readQuadtree(msg.Data)
+            if err!=nil { return nil,err }
 		}
 	}
 
-	return &wayrefs{a, b, c}, nil
+	return &wayrefs{id,qt,rfs}, nil
 
 }
 
 func (readObjsData) relation(buf []byte, st []string, ct elements.ChangeType) (elements.Element, error) {
-	a, b := int64(0), int64(-1)
-	var c []uint64
-	var d []int64
+	id, qt := elements.Ref(0), quadtree.Null
+	var mt []uint64
+	var mr []int64
+    var err error
 	pos, msg := utils.ReadPbfTag(buf, 0)
 	for ; msg.Tag > 0; pos, msg = utils.ReadPbfTag(buf, pos) {
 		switch msg.Tag {
 		//ignore info and tags
 		case 1:
-			a = int64(msg.Value)
+			id = elements.Ref(msg.Value)
 		case 10:
-			c, _ = utils.ReadPackedList(msg.Data)
+			mt, err = utils.ReadPackedList(msg.Data)
+            if err!=nil { return nil,err}
 		case 9:
-			d, _ = utils.ReadDeltaPackedList(msg.Data)
+			mr, _ = utils.ReadDeltaPackedList(msg.Data)
+            if err!=nil { return nil,err}
 		case 20:
-			b = utils.UnZigzag(msg.Value)
+			qt = quadtree.Quadtree(utils.UnZigzag(msg.Value))
+        case 21:
+            qt,err = readQuadtree(msg.Data)
+            if err!=nil { return nil,err }
 		}
 	}
 	//println("ret rel",a,b,c,d)
-	return &relmems{a, b, c, d}, nil
+	return &relmems{id,qt,mt,mr}, nil
 
 }
 
 func (readObjsData) dense(buf []byte, st []string, objs elements.ByElementId, ct elements.ChangeType) (elements.ByElementId, error) {
 	var ii, qq, ln, lt []int64
-
+    var qx,qy,qz []int64
 	var err error
 	pos, msg := utils.ReadPbfTag(buf, 0)
 	for ; msg.Tag > 0; pos, msg = utils.ReadPbfTag(buf, pos) {
@@ -172,6 +190,12 @@ func (readObjsData) dense(buf []byte, st []string, objs elements.ByElementId, ct
 			ln, err = utils.ReadDeltaPackedList(msg.Data)
 		case 20:
 			qq, err = utils.ReadDeltaPackedList(msg.Data)
+        case 21:
+			qx, err = utils.ReadDeltaPackedList(msg.Data)
+        case 22:
+			qy, err = utils.ReadDeltaPackedList(msg.Data)
+        case 23:
+			qz, err = utils.ReadDeltaPackedList(msg.Data)
 		}
 
 		if err != nil {
@@ -179,7 +203,12 @@ func (readObjsData) dense(buf []byte, st []string, objs elements.ByElementId, ct
 		}
 
 	}
-
+    if len(qq)==0 && len(qx)>0 {
+        qq,err = read_packed_quadtrees(qx,qy,qz)
+        if err!=nil { return nil,err }
+    }
+    
+    
 	for i, id := range ii {
 		q := int64(-1)
 		if qq != nil && i < len(qq) {
@@ -191,7 +220,7 @@ func (readObjsData) dense(buf []byte, st []string, objs elements.ByElementId, ct
 			//return nil,missingData
 			n, t = ln[i], lt[i]
 		}
-		objs = append(objs, &nodeloc{id, q, n, t})
+		objs = append(objs, &nodeloc{elements.Ref(id), quadtree.Quadtree(q), n, t})
 
 	}
 	return objs, nil

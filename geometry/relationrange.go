@@ -81,7 +81,7 @@ func AddRelationRange(inc <-chan elements.ExtendedBlock, testRel func(TagsEditab
 		ss := map[elements.Ref]*pendingTags{}
 
 		idx := 0
-
+        nrls,nwys,nsnt := 0, 0, 0
 		for bl := range inc {
 
 			bq := bl.Quadtree()
@@ -98,6 +98,7 @@ func AddRelationRange(inc <-chan elements.ExtendedBlock, testRel func(TagsEditab
 					}
 
 					if testRel(tt) && tt.Has(srctag) {
+                        nrls++
 						v := tt.Get(srctag)
 						for j := 0; j < fr.Len(); j++ {
 							if fr.MemberType(j) == elements.Way {
@@ -110,6 +111,7 @@ func AddRelationRange(inc <-chan elements.ExtendedBlock, testRel func(TagsEditab
 								}
 								p.s = append(p.s, v)
 								ss[w] = p
+                                nwys++
 							}
 						}
 
@@ -134,7 +136,7 @@ func AddRelationRange(inc <-chan elements.ExtendedBlock, testRel func(TagsEditab
 						delete(ss, e.Id())
 
 						nb = append(nb, fw)
-
+                        nsnt++
 					} else {
 						nb = append(nb, e)
 					}
@@ -155,7 +157,7 @@ func AddRelationRange(inc <-chan elements.ExtendedBlock, testRel func(TagsEditab
 				delete(ss, k)
 			}
 		}
-
+        fmt.Printf("read %d rels, %d ways; wrote %d ways\n", nrls, nwys, nsnt)
 		close(res)
 	}()
 	return res

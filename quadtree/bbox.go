@@ -38,6 +38,10 @@ func PlanetBbox() *Bbox {
 	return &Bbox{MinLon, MinLat, MaxLon, MaxLat}
 }
 
+func (bbox Bbox) Empty() bool {
+    return bbox.Minx >= bbox.Maxx || bbox.Miny >= bbox.Maxy
+}
+
 func (bbox Bbox) String() string {
 	return fmt.Sprintf("[%10d, %10d, %10d, %10d]",
 		bbox.Minx, bbox.Miny,

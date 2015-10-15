@@ -130,3 +130,29 @@ func IntValue(s int64) Value        { return intValue(s) }
 func FloatValue(s float64) Value    { return floatValue(s) }
 func nullValue() Value              { return &NullValue{nil} }
 func GeomValue(f interface{}) Value { return &NullValue{f} }
+
+func (l intValue) Less(r Value) bool {
+    if r.Type()=="INTEGER" { return l.AsInt() < r.AsInt() }
+    return true
+}
+
+func (l floatValue) Less(r Value) bool {
+    if r.Type()=="FLOAT" { return l.AsFloat() < r.AsFloat() }
+    return true
+}
+
+
+func (l boolValue) Less(r Value) bool {
+    if r.Type()=="BOOL" { return !l.AsBool() && r.AsBool() }
+    return true
+}
+
+func (l stringValue) Less(r Value) bool {
+    if r.Type()=="STRING" { return l.AsString() < r.AsString() }
+    return true
+}
+
+func (*NullValue) Less(v Value) bool {
+    return true
+}
+

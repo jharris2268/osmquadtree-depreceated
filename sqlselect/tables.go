@@ -162,10 +162,10 @@ func (jq *joinQuery) String() string {
 //**********************************************************************
 
 type simpleSelect struct {
-	Table   Tabler
-	Columns []Rower
-	Where   Wherer
-	Order   Orderer
+	table   Tabler
+	columns []Rower
+	where   Wherer
+	order   Orderer
 }
 
 func makeSimpleSelect(tab Tabler, cols []Rower, where Wherer, order orderList) Tabler {
@@ -185,13 +185,13 @@ func makeSimpleSelect(tab Tabler, cols []Rower, where Wherer, order orderList) T
 
 func (ss *simpleSelect) String() string {
 	wherestr := ""
-	if ss.Where != nil {
-		wherestr = "\n  where: " + ss.Where.String()
+	if ss.where != nil {
+		wherestr = "\n  where: " + ss.where.String()
 	}
 	selstr := "*"
-	if ss.Columns != nil {
-		pp := make([]string, len(ss.Columns))
-		for i, c := range ss.Columns {
+	if ss.columns != nil {
+		pp := make([]string, len(ss.columns))
+		for i, c := range ss.columns {
 			if c != nil {
 				pp[i] = c.String()
 			}
@@ -199,13 +199,13 @@ func (ss *simpleSelect) String() string {
 		selstr = strings.Join(pp, ", ")
 	}
 	tstr := ""
-	if ss.Table != nil {
-		tstr = strings.Replace(ss.Table.String(), "\n", "\n\t\t", -1)
+	if ss.table != nil {
+		tstr = strings.Replace(ss.table.String(), "\n", "\n\t\t", -1)
 
 	}
 
 	orderstr := ""
-	if ss.Order != nil {
+	if ss.order != nil {
 		/*ol,ok:=ss.Order.(orderList)
 		  if ok && len(ol) == 0 {
 		      ss.Order=nil
@@ -223,32 +223,32 @@ func (ss *simpleSelect) String() string {
 		      }
 
 		  }*/
-		orderstr = "\n order: " + ss.Order.String()
+		orderstr = "\n order: " + ss.order.String()
 	}
 
 	return fmt.Sprintf("SELECT(\n  cols:  %s\n  from:  %s%s%s\n)", selstr, tstr, wherestr, orderstr)
 }
 
 func (ss *simpleSelect) Result(tables Tables) (Result, error) {
-	rr, err := ss.Table.Result(tables)
+	rr, err := ss.table.Result(tables)
 	if err != nil {
 		return nil, err
 	}
-	if ss.Where == nil && ss.Columns == nil && ss.Order == nil {
+	if ss.where == nil && ss.columns == nil && ss.order == nil {
 		return rr, nil
 	}
 
-	cols := ss.Columns
+	cols := ss.columns
 	if cols == nil {
 		//println("nil cols, use parent",len(rr.Columns()))
 		cols = rr.Columns()
 	}
 
 	var rrs []int
-	if ss.Where != nil {
+	if ss.where != nil {
 		rrs = make([]int, 0, rr.Len())
 		for i := 0; i < rr.Len(); i++ {
-			if ss.Where.Where(rr.Row(i)) {
+			if ss.where.Where(rr.Row(i)) {
 				rrs = append(rrs, i)
 			}
 		}
@@ -262,10 +262,10 @@ func (ss *simpleSelect) Result(tables Tables) (Result, error) {
 	rs := &resultSet{rr, rrs, cols}
 	//println(fmt.Sprintf("selected %d rows, %d cols",rr.Len(),len(cols)))
 
-	if ss.Order != nil {
+	if ss.order != nil {
 		//sl,ok := ss.Order.(orderList)
 		//if !ok || len(sl)!=0 {
-		sortResultSet(rs, ss.Order)
+		sortResultSet(rs, ss.order)
 		/*if len(rs.rows)>5{
 		    println(fmt.Sprintf("%v %v",rs.rows[:5],rs.rows[len(rs.rows)-5:]))
 		}*/
@@ -275,6 +275,15 @@ func (ss *simpleSelect) Result(tables Tables) (Result, error) {
 	return rs, nil
 
 }
+
+func (ss *simpleSelect) Columns() []string {
+    ans := make([]string,len(ss.columns))
+    for i,c := range ss.columns {
+        ans[i] = c.Key()
+    }
+    return ans
+}
+
 
 //**********************************************************************
 

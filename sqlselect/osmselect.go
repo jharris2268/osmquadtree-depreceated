@@ -8,6 +8,7 @@ package sqlselect
 import (
 	"fmt"
 	"strconv"
+    "strings"
 )
 
 type Result interface {
@@ -24,6 +25,7 @@ type Value interface {
 	AsFloat() float64
 	AsBool() bool
 	IsNull() bool
+    Less(Value) bool
 }
 
 type Row interface {
@@ -38,6 +40,7 @@ type Tables map[string]Result
 type Tabler interface {
 	String() string
 	Result(Tables) (Result, error)
+    //Columns() string
 }
 type Wherer interface {
 	String() string
@@ -91,7 +94,7 @@ func (oo orderList) Less(r1, r2 Row) bool {
 	return false
 }
 func (ol orderList) String() string {
-	return fmt.Sprintf("%v", []order(ol))
+	return fmt.Sprintf("%s", []order(ol))
 }
 func (ol orderList) Columns() []Rower {
 	cl := make([]Rower, len(ol))
@@ -104,12 +107,31 @@ func (ol orderList) Columns() []Rower {
 type rowerList []Rower
 
 func makeNumVal(vstr string) Value {
+    if strings.Contains(vstr, "::") {
+        vstr = vstr[:strings.Index(vstr,"::")]
+    }
+    
 	//println("makeNumVal",vstr)
 	ii, err := strconv.ParseInt(vstr, 10, 64)
 	if err == nil {
 		//println("isint",ii)
 		return intValue(ii)
 	}
+
+	ff, err := strconv.ParseFloat(vstr, 64)
+	if err == nil {
+		//println("isfloat",ff)
+		return floatValue(ff)
+	}
+	return nil
+
+}
+
+func makeFloatVal(vstr string) Value {
+    if strings.Contains(vstr, "::") {
+        vstr = vstr[:strings.Index(vstr,"::")]
+    }
+    
 
 	ff, err := strconv.ParseFloat(vstr, 64)
 	if err == nil {

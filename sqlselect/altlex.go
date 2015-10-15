@@ -274,7 +274,7 @@ var keywords = map[string]bool{
 	"then": true, "join": true, "union": true, "is": true, "not": true,
 	"null": true, "and": true, "or": true, "order": true, "by": true,
 	"asc": true, "desc": true, "values": true, "using": true, "all": true,
-	"between": true,
+	"between": true, "like":true,
 }
 
 func isKeyword(s string) (bool, string) {
@@ -430,6 +430,8 @@ func toLexInt(item string) int {
 		return ALL
 	case "BETWEEN":
 		return BETWEEN
+    case "LIKE":
+		return LIKE
 		//case "COALESCE": return COALESCE
 	}
 	return LEX_ERROR

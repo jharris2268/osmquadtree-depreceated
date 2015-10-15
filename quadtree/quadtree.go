@@ -179,6 +179,10 @@ func (qt Quadtree) Bounds(buffer float64) Bbox {
 //Tile coordinate as (x,y,z), with y at the top (nb. tile filenames
 // usually <z>/<x>/<y>.png).
 func (qt Quadtree) Tuple() (int64, int64, int64) {
+    if qt==Null {
+        return -1,-1,-1
+    }
+    
 	z := int64(qt & 31)
 	x := int64(0)
 	y := int64(0)
@@ -247,6 +251,10 @@ func Calculate(box Bbox, buffer float64, maxLevel uint) (Quadtree, error) {
 }
 
 func FromTuple(x int64, y int64, z int64) (Quadtree, error) {
+    if x==-1 && y==-1 && z==-1 {
+        return Null, nil
+    }
+    
 	ans := int64(0)
 	scale := int64(1)
 	for i := uint(0); i < uint(z); i++ {

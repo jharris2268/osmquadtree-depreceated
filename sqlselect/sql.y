@@ -279,14 +279,14 @@ condition:
   {
     $$ = &notExpr{&isInExpr{$1, $4} }
   }
-/*| value_expression LIKE value_expression
+| value_expression LIKE value_expression
   {
-    $$ = &ComparisonExpr{Left: $1, Operator: AST_LIKE, Right: $3}
+    $$ = &compExpr{$1,$3,"LIKE"}
   }
 | value_expression NOT LIKE value_expression
   {
-    $$ = &ComparisonExpr{Left: $1, Operator: AST_NOT_LIKE, Right: $4}
-  }*/
+    $$ = &notExpr{&compExpr{$1,$4,"LIKE"}}
+  }
 | value_expression BETWEEN value_expression AND value_expression
   {
     $$ = &rangeExpr{$1, $3, $5}

@@ -20,6 +20,78 @@ func coalesceFunc(exprs []Rower, row Row) Value {
 	return nullValue()
 }
 
+
+func nullifFunc(exprs []Rower, row Row) Value {
+    if len(exprs)!=2 { return nullValue(); }
+    vl0 := exprs[0].Value(row)
+    vl1 := exprs[1].Value(row)
+    
+    if valCompOp(vl0,vl1, "=") {
+        return nullValue()
+    }
+    return vl0
+}
+
+func strreplaceFunc(exprs []Rower, row Row) Value {
+    if len(exprs) != 3 {
+		println("strreplaceFunc: len(exprs)!=3")
+		return nullValue()
+	}
+    vl := exprs[0].Value(row)
+    a  := exprs[1].Value(row)
+    b  := exprs[2].Value(row)
+    
+    if (vl.Type()!="STRING") || (a.Type()!="STRING") || (b.Type()!="String") {
+        return nullValue()
+    }
+    
+    ns := strings.Replace(vl.AsString(), a.AsString(), b.AsString(),-1)
+    return stringValue(ns)
+}
+
+func numcharFunc(exprs []Rower, row Row) Value {
+    if len(exprs) != 2 {
+		println("numcharFunc: len(exprs)!=3")
+		return nullValue()
+	}
+    vl := exprs[0].Value(row)
+    c  := exprs[1].Value(row)
+    
+    
+    if (vl.Type()!="STRING") || (c.Type()!="STRING") {
+        return nullValue()
+    }
+    
+    ns := strings.Count(vl.AsString(), c.AsString())
+    return intValue(ns)
+}
+
+func maxwidthFunc(exprs []Rower, row Row) Value {
+    if len(exprs) ==0 || len(exprs)> 2 {
+		println("maxwidthFunc: len(exprs)!=3")
+		return nullValue()
+	}
+    vl := exprs[0].Value(row)
+    c := "\n"
+    if len(exprs)==2 {
+        c = exprs[1].Value(row).AsString()
+    }
+    
+    
+    if (vl.Type()!="STRING") || c==""{
+        return nullValue()
+    }
+    
+    ns := strings.Split(vl.AsString(), c)
+    ml := 0
+    for _,s := range ns {
+        if len(s)>ml { 
+            ml = len(s)
+        }
+    }
+    return intValue(ml)
+}
+
 func makeintegerFunc(exprs []Rower, row Row) Value {
 	if len(exprs) != 1 {
 		println("makeintegerFunc: len(exprs)!=1")
@@ -33,6 +105,21 @@ func makeintegerFunc(exprs []Rower, row Row) Value {
 		}
 	}
 	return intValue(0)
+}
+
+func makefloatFunc(exprs []Rower, row Row) Value {
+	if len(exprs) != 1 {
+		println("makeintegerFunc: len(exprs)!=1")
+		return nullValue()
+	}
+	vl := exprs[0].Value(row)
+	if vl.Type() == "STRING" {
+		rs := makeFloatVal(vl.AsString())
+		if rs != nil && rs.Type() == "FLOAT" {
+			return rs
+		}
+	}
+	return floatValue(0)
 }
 
 func charlengthFunc(exprs []Rower, row Row) Value {
@@ -129,21 +216,32 @@ func (ce *mathExpr) String() string {
 	return fmt.Sprintf("Math(%s,%s,%s)", ce.ll, ce.op, ce.rr)
 }
 func (me *mathExpr) Key() string { return "" }
+
+
+func asFloat(v Value) float64 {
+    if v.Type() == "FLOAT" {
+        return v.AsFloat()
+    }
+    return float64(v.AsInt())
+}
+    
+
 func (me *mathExpr) Value(row Row) Value {
 	lv := me.ll.Value(row)
 	if lv.IsNull() || !(lv.Type() == "INTEGER" || lv.Type() == "FLOAT") {
 		return nullValue()
 	}
 	rv := me.rr.Value(row)
-	if rv.IsNull() || rv.Type() != lv.Type() {
+	if rv.IsNull() || !(lv.Type() == "INTEGER" || lv.Type() == "FLOAT") {
 		return nullValue()
 	}
-	switch lv.Type() {
-	case "INTEGER":
-		return intValue(intOp(lv.AsInt(), rv.AsInt(), me.op))
-	case "FLOAT":
-		return floatValue(floatOp(lv.AsFloat(), rv.AsFloat(), me.op))
-	}
+    
+    if (lv.Type()=="INTEGER" && rv.Type()=="INTEGER") {
+        return intValue(intOp(lv.AsInt(), rv.AsInt(), me.op))
+    }
+    
+    return floatValue(floatOp(asFloat(lv), asFloat(rv), me.op))
+	
 	return nullValue()
 }
 
@@ -208,6 +306,13 @@ func valCompOp(lv Value, rv Value, op string) bool {
 	return false
 }
 
+func likeOp(l, r string) bool {
+    if strings.HasSuffix(r, "%") {
+        return strings.HasPrefix(l, r[:len(r)-1])
+    }
+    return false
+}
+
 func stringCompOp(l string, r string, op string) bool {
 	switch op {
 	case "=":
@@ -222,6 +327,8 @@ func stringCompOp(l string, r string, op string) bool {
 		return l >= r
 	case "<=":
 		return l <= r
+    case "LIKE":
+        return likeOp(l,r)
 	}
 	println("unknown op", op)
 	return false
@@ -295,8 +402,18 @@ func (fe *funcExpr) Value(row Row) Value {
 		return charlengthFunc(fe.exprs, row)
 	case "makeinteger":
 		return makeintegerFunc(fe.exprs, row)
+    case "makefloat":
+		return makefloatFunc(fe.exprs, row)
 	case "concat":
 		return concatFunc(fe.exprs, row)
+    case "nullif":
+        return nullifFunc(fe.exprs, row)
+    case "strreplace":
+        return strreplaceFunc(fe.exprs, row)
+    case "numchar":
+        return numcharFunc(fe.exprs, row)
+    case "maxwidth":
+        return maxwidthFunc(fe.exprs, row)
 	default:
 		println("unexpected function:", fe.name)
 	}

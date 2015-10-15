@@ -150,12 +150,14 @@ func packDense(bl elements.Block, stm map[string]int, from int, to int, writeExt
 	mki := func() []int64 { return make([]int64, to-from) }
 	mku := func() []uint64 { return make([]uint64, to-from) }
 
-	ii, qt, ln, lt := mki(), mki(), mki(), mki()
+	ii, /*qt,*/ ln, lt := mki(), /*mki(),*/ mki(), mki()
+    qx,qy,qz := mki(), mki(), mki()
 	kvs := make([]uint64, 0, (to-from)*5)
 	i_vs, i_ts, i_cs, i_ui, i_us, i_vv := mku(), mki(), mki(), mki(), mki(), mku()
 	all_visible := true
 	if !writeExtra {
-		qt = nil
+		//qt = nil
+        qx = nil
 	}
 
 	for i, _ := range ii {
@@ -166,14 +168,16 @@ func packDense(bl elements.Block, stm map[string]int, from int, to int, writeExt
 		}
 
 		ii[i] = int64(e.Id())
-		if writeExtra && (i == 0 || qt != nil) {
+		if writeExtra && (i == 0 || /*qt*/qx != nil) {
 			q, ok := e.(interface {
 				Quadtree() quadtree.Quadtree
 			})
 			if ok {
-				qt[i] = int64(q.Quadtree())
+                qx[i],qy[i],qz[i] = q.Quadtree().Tuple()
+				//qt[i] = int64(q.Quadtree())
 			} else {
-				qt = nil
+				//qt = nil
+                qx,qy,qz = nil,nil,nil
 			}
 		}
 		if i == 0 || ln != nil {
@@ -260,10 +264,21 @@ func packDense(bl elements.Block, stm map[string]int, from int, to int, writeExt
 		kvsp, _ := utils.PackPackedList(kvs)
 		msgs = append(msgs, utils.PbfMsg{10, kvsp, 0})
 	}
-	if qt != nil {
+	/*if qt != nil {
 		qtp, _ := utils.PackDeltaPackedList(qt)
 		msgs = append(msgs, utils.PbfMsg{20, qtp, 0})
+	}*/
+    if qx != nil {
+		qtp, _ := utils.PackDeltaPackedList(qx)
+		msgs = append(msgs, utils.PbfMsg{21, qtp, 0})
+        
+        qtp, _ = utils.PackDeltaPackedList(qy)
+		msgs = append(msgs, utils.PbfMsg{22, qtp, 0})
+        
+        qtp, _ = utils.PackDeltaPackedList(qz)
+		msgs = append(msgs, utils.PbfMsg{23, qtp, 0})
 	}
+    
 	return msgs.Pack(), nil
 }
 
@@ -307,8 +322,9 @@ func packElement(e elements.Element, stm map[string]int, writeExtra bool) (uint6
 		qt, ok := e.(interface {
 			Quadtree() quadtree.Quadtree
 		})
-		if ok && qt.Quadtree() != quadtree.Null {
-			msgs = append(msgs, utils.PbfMsg{20, nil, utils.Zigzag(int64(qt.Quadtree()))})
+		if ok { //&& qt.Quadtree() != quadtree.Null {
+			//msgs = append(msgs, utils.PbfMsg{20, nil, utils.Zigzag(int64(qt.Quadtree()))})
+            msgs = append(msgs, utils.PbfMsg{21, packQuadtree(qt.Quadtree()), 0})
 		}
 	}
 

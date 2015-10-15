@@ -7,7 +7,7 @@ package geometry
 
 import (
 	"math"
-
+    "fmt"
 	"github.com/jharris2268/osmquadtree/elements"
 	"github.com/jharris2268/osmquadtree/quadtree"
 	"github.com/jharris2268/osmquadtree/utils"
@@ -138,7 +138,7 @@ func packBbox(bb quadtree.Bbox) []byte {
 	ans[0] = utils.PbfMsg{1, nil, utils.Zigzag(bb.Minx)}
 	ans[1] = utils.PbfMsg{2, nil, utils.Zigzag(bb.Miny)}
 
-	ans[2] = utils.PbfMsg{5, nil, utils.Zigzag(bb.Maxy - bb.Minx)}
+	ans[2] = utils.PbfMsg{5, nil, utils.Zigzag(bb.Maxx - bb.Minx)}
 	ans[3] = utils.PbfMsg{6, nil, utils.Zigzag(bb.Maxy - bb.Miny)}
 	return ans.Pack()
 }
@@ -159,6 +159,7 @@ func extractGeometry(gp elements.PackedGeometry) (Geometry, error) {
 	case MultiPoint, MultiLinestring, MultiPolygon, Multi:
 		return makeMultiGeometry(gp, gp.Tags(), objs, zorder, area), nil
 	}
+    fmt.Println("???",gt,objs,zorder,area)
 	return nil, UnrecognisedGeometryError
 }
 func readGeometryBbox(indata []byte) (GeometryType, *quadtree.Bbox, error) {

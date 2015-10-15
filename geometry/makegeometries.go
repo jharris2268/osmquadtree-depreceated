@@ -11,7 +11,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"sync"
+	//"sync"
 
 	"github.com/jharris2268/osmquadtree/elements"
 	"github.com/jharris2268/osmquadtree/quadtree"
@@ -186,15 +186,16 @@ func HandleRelations(inc <-chan elements.ExtendedBlock, tagsFilter map[string]Ta
 	res := make(chan elements.ExtendedBlock)
 
 	relc := make(chan elements.ExtendedBlock)
-	wg := sync.WaitGroup{}
-	wg.Add(1)
+	//wg := sync.WaitGroup{}
+	//wg.Add(1)
 
 	go func() {
 		err := finishRelations(relc, res, tagsFilter)
 		if err != nil {
 			panic(err.Error())
 		}
-		wg.Done()
+		//wg.Done()
+        close(res)
 	}()
 
 	go func() {
@@ -245,8 +246,8 @@ func HandleRelations(inc <-chan elements.ExtendedBlock, tagsFilter map[string]Ta
 		}
 		close(relc)
 		//println("waiting for rels...")
-		wg.Wait()
-		close(res)
+		//wg.Wait()
+		//close(res)
 	}()
 
 	return res
@@ -256,6 +257,7 @@ type pendingEle struct {
 	qt quadtree.Quadtree
 	ee elements.FullElement
 	ww map[elements.Ref]bool
+    tt []string
 }
 
 type pendingEleMap map[elements.Ref]*pendingEle
@@ -492,9 +494,15 @@ func finishRel(ways *pendingEleMap, rel *pendingEle, tagsFilter map[string]TagTe
 			}
 
 			if len((*ways)[w].ww) == 0 {
-				wy := (*ways)[w].ee
-				if wy != nil && IsFeature(wy.Tags(), tagsFilter) {
-					finished = append(finished, wy)
+                wy := (*ways)[w]
+                if wy.ee != nil {
+                    tgs := wy.ee.Tags().(TagsEditable)
+                    for _,t:=range wy.tt {
+                        tgs.Delete(t)
+                    }
+                    if IsFeature(tgs, tagsFilter) {
+                        finished = append(finished, wy.ee)
+                    }
 				}
 				delete(*ways, w)
 			}
@@ -565,7 +573,8 @@ func finishRel(ways *pendingEleMap, rel *pendingEle, tagsFilter map[string]TagTe
 				k := rt.Key(j)
 				v := rt.Value(j)
 				if wyt.Has(k) && wyt.Get(k) == v {
-					(*ways)[w].ee.Tags().(TagsEditable).Delete(k)
+					//(*ways)[w].ee.Tags().(TagsEditable).Delete(k)
+                    (*ways)[w].tt = append((*ways)[w].tt, k)
 				}
 			}
 		}
@@ -612,37 +621,25 @@ func finishRelations(
 	ways := pendingEleMap{}
 	li := 0
 
-	/*mm := writeMsgs()
-	  defer close(mm)
-	  zz:=0
-	  tgg:=0
-	  rc:=0
-	  tin:=0
-	  st:=time.Now()*/
+	
 	for bl := range inc {
-		/*w:=time.Since(st).Seconds()
-		  st=time.Now()*/
 		finished := make(elements.ByElementId, 0, bl.Len())
 
 		bq := bl.Quadtree()
-		/*mm <- fmt.Sprintf("finishRelations %s: have %d rels, %d ways %d in %d fin %d total sent wait: %0.3fs ", bl, len(rels),len(ways), tin,rc,tgg, w)
-		  //fg:=false
-		  tin += bl.Len()*/
 		for i := 0; i < bl.Len(); i++ {
 
 			e := bl.Element(i)
-			//println("@",e.String())
-
+			
 			switch e.Type() {
 			case elements.Relation:
 				rel := e.(elements.FullRelation)
 				rr := map[elements.Ref]bool{}
 				addWays(rr, rel)
 				if len(rr) > 0 {
-					rels[rel.Id()] = &pendingEle{bq, rel, rr}
+					rels[rel.Id()] = &pendingEle{bq, rel, rr,[]string{}}
 					for r, _ := range rr {
 						if _, ok := ways[r]; !ok {
-							ways[r] = &pendingEle{bq, nil, map[elements.Ref]bool{}}
+							ways[r] = &pendingEle{bq, nil, map[elements.Ref]bool{}, []string{}}
 						}
 						ways[r].ww[rel.Id()] = true
 
@@ -653,38 +650,36 @@ func finishRelations(
 				ei := e.Id() & 0xffffffffffff
 
 				if _, ok := ways[ei]; !ok {
-					log.Println("Not needed?", e)
+					//log.Println("Not needed?", e)
 					finished = append(finished, e)
-					continue
+					
 					//panic("way not needed?")
-				}
-				t := ways[ei]
-				t.qt = bq
+				} else {
+                    t := ways[ei]
+                    t.qt = bq
 
-				t.ee = e.(elements.FullElement)
-				ways[ei] = t
+                    t.ee = e.(elements.FullElement)
+                    ways[ei] = t
 
-				for r, _ := range ways[ei].ww {
-					rl, ok := rels[r]
-					if ok {
-						if _, ok := rl.ww[ei]; ok {
-							delete(rels[r].ww, ei)
-						}
-					}
-				}
+                    for r, _ := range ways[ei].ww {
+                        rl, ok := rels[r]
+                        if ok {
+                            if _, ok := rl.ww[ei]; ok {
+                                delete(rels[r].ww, ei)
+                            }
+                        }
+                    }
+                }
 
 			}
 
 		}
 		fws := make([]elements.Ref, 0, len(rels))
-		//println("check rels")
 		for r, v := range rels {
 			if len(v.ww) == 0 || bq.Common(v.qt) != v.qt {
 				fws = append(fws, r)
 			}
 		}
-		//mm <- fmt.Sprintf("finish: %d",len(fws))
-		//nw := len(ways)
 		if len(fws) > 0 {
 			//println("finish",len(fws),"rels")
 			for _, r := range fws {
@@ -705,28 +700,17 @@ func finishRelations(
 			}
 			//println("done")
 		}
-		//nwr := nw-len(ways)
-
-		//mm <- fmt.Sprintf(" %d %d",len(gg),nwr)
-
+		
 		if len(finished) > 0 {
-			//tgg+=len(gg)
 			rb := elements.MakeExtendedBlock(bl.Idx(), finished, bl.Quadtree(), bl.StartDate(), bl.EndDate(), nil)
-			//log.Println(bl.Idx(),"output:",rb)
 			res <- rb
 		}
 
-		//t:=time.Since(st).Seconds()
-		//mm <- fmt.Sprintf(" %0.3fs\n",t)
-
+		
 		li = bl.Idx()
-		/*st=time.Now()
-		  if (zz%1273) == 0 {
-		      debug.FreeOSMemory()
-		  }
-		  zz++*/
+		
 	}
-	//mm <- fmt.Sprintf("have %d rels, %d ways remaining\n", len(rels),len(ways))
+	
 
 	finished := make(elements.ByElementId, 0, len(rels)+len(ways))
 	for _, r := range rels {
@@ -744,7 +728,7 @@ func finishRelations(
 	}
 	if len(finished) > 0 {
 
-		//mm <- fmt.Sprintf("sending %d objs\n", len(gg))
+		
 		rb := elements.MakeExtendedBlock(li+1, finished, 0, 0, 0, nil)
 		log.Println("remaining output:", rb)
 		res <- rb
