@@ -111,7 +111,7 @@ func find_id_and_qt(buf []byte) (elements.Ref, quadtree.Quadtree, error) {
     idok,qtok := false,false
     var err error
     pos, msg := utils.ReadPbfTag(buf, 0)
-    for ; ((msg.Tag > 0) && !idok && !qtok); pos, msg = utils.ReadPbfTag(buf, pos) {
+    for ; ((msg.Tag > 0) && (!idok || !qtok)); pos, msg = utils.ReadPbfTag(buf, pos) {
         switch msg.Tag {
             case 1:
                 id = elements.Ref(msg.Value)
@@ -121,14 +121,16 @@ func find_id_and_qt(buf []byte) (elements.Ref, quadtree.Quadtree, error) {
                 qtok = true
             case 21:
                 qt,err = readQuadtree(msg.Data)
+                
                 if err!=nil {
                     return id,qt,err
                 }
                 qtok = true
+                
         }
     }
     if !idok || !qtok {
-        fmt.Println("??",id,qt)
+        fmt.Println("??",idok,qtok,id,qt,"qt=",len(buf))
         return id,qt,missingData
     }
     return id,qt,nil
