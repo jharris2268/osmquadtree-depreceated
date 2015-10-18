@@ -60,7 +60,7 @@ type Coord interface {
 
 type Geometry interface {
 	elements.FullElement
-
+    OriginalType() elements.ElementType
 	AsWkt(bool) string
 	AsWkb(bool) []byte
 	AsGeoJson(bool) interface{}
@@ -122,7 +122,7 @@ func ExtractGeometryBboxData(o elements.Element) (GeometryType, *quadtree.Bbox, 
 				return gt, bx, gd, nil
 			}
 
-			gt, cc, _, _, err := extractGeometryData(gd)
+			gt, _, cc, _, _, err := extractGeometryData(gd)
 
 			if err != nil {
 				return 0, nil, nil, err
@@ -153,7 +153,7 @@ func ExtractGeometryBbox(o elements.Element) (GeometryType, *quadtree.Bbox, erro
 				return gt, bx, nil
 			}
 
-			gt, cc, _, _, err := extractGeometryData(gp.GeometryData())
+			gt, _, cc, _, _, err := extractGeometryData(gp.GeometryData())
 
 			if err != nil {
 				return 0, nil, err

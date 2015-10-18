@@ -54,12 +54,13 @@ type pointGeometryImpl struct {
 	tags elements.Tags
 	qt   quadtree.Quadtree
 
+    ot    elements.ElementType
 	coord Coord
 }
 
-func makePointGeometry(gp elements.FullElement, tg elements.Tags, coord Coord) PointGeometry {
+func makePointGeometry(gp elements.FullElement, ot elements.ElementType, tg elements.Tags, coord Coord) PointGeometry {
 
-	return &pointGeometryImpl{gp.ChangeType(), gp.Id(), gp.Info(), tg, gp.Quadtree(), coord}
+	return &pointGeometryImpl{gp.ChangeType(), gp.Id(), gp.Info(), tg, gp.Quadtree(), ot, coord}
 }
 
 type linestringGeometryImpl struct {
@@ -69,20 +70,17 @@ type linestringGeometryImpl struct {
 	tags elements.Tags
 	qt   quadtree.Quadtree
 
+    ot    elements.ElementType
 	coords []Coord
 	zorder int64
 	bbox   *quadtree.Bbox
 }
 
-func makeLinestringGeometry(gp elements.FullElement, tg elements.Tags, coords []Coord, zorder int64) LinestringGeometry {
+func makeLinestringGeometry(gp elements.FullElement, ot elements.ElementType, tg elements.Tags, coords []Coord, zorder int64) LinestringGeometry {
 	i := gp.Id()
-	switch gp.Type() {
-	case elements.Way:
-		i |= elements.Ref(1 << 59)
-
-	}
+	
 	bb := makeBbox(coords)
-	return &linestringGeometryImpl{gp.ChangeType(), i, gp.Info(), tg, gp.Quadtree(), coords, zorder, bb}
+	return &linestringGeometryImpl{gp.ChangeType(), i, gp.Info(), tg, gp.Quadtree(), ot, coords, zorder, bb}
 }
 
 func reverseCoords(cc []Coord) {
@@ -117,7 +115,7 @@ func PartialLinestringGeometry(ls LinestringGeometry, fr int, to int) Linestring
 	}
 	ts.Put("from", fmt.Sprintf("%d", fr))
 	ts.Put("to", fmt.Sprintf("%d", to))
-	return makeLinestringGeometry(ls, ts, coords, ls.ZOrder())
+	return makeLinestringGeometry(ls, ls.OriginalType(), ts, coords, ls.ZOrder())
 }
 
 type polygonGeometryImpl struct {
@@ -127,24 +125,18 @@ type polygonGeometryImpl struct {
 	tags elements.Tags
 	qt   quadtree.Quadtree
 
+    ot    elements.ElementType
 	coords [][]Coord
 	zorder int64
 	area   float64
 	bbox   *quadtree.Bbox
 }
 
-func makePolygonGeometry(gp elements.FullElement, tg elements.Tags, coords [][]Coord, zorder int64, area float64) PolygonGeometry {
+func makePolygonGeometry(gp elements.FullElement, ot elements.ElementType, tg elements.Tags, coords [][]Coord, zorder int64, area float64) PolygonGeometry {
 	i := gp.Id()
-	switch gp.Type() {
-	case elements.Way:
-		i |= elements.Ref(1 << 59)
-	case elements.Relation:
-		i |= elements.Ref(2 << 59)
-
-	}
-
+	
 	bb := makeBbox(coords[0])
-	return &polygonGeometryImpl{gp.ChangeType(), i, gp.Info(), tg, gp.Quadtree(), coords, zorder, area, bb}
+	return &polygonGeometryImpl{gp.ChangeType(), i, gp.Info(), tg, gp.Quadtree(), ot, coords, zorder, area, bb}
 }
 
 type multiGeometryImpl struct {
@@ -154,28 +146,23 @@ type multiGeometryImpl struct {
 	tags elements.Tags
 	qt   quadtree.Quadtree
 
+    ot    elements.ElementType
 	coords [][][]Coord
 	zorder int64
 	area   float64
 	bbox   *quadtree.Bbox
 }
 
-func makeMultiGeometry(gp elements.FullElement, tg elements.Tags, coords [][][]Coord, zorder int64, area float64) MultiGeometry {
+func makeMultiGeometry(gp elements.FullElement, ot elements.ElementType, tg elements.Tags, coords [][][]Coord, zorder int64, area float64) MultiGeometry {
 
 	i := gp.Id()
-	switch gp.Type() {
-	case elements.Way:
-		i |= elements.Ref(1 << 59)
-	case elements.Relation:
-		i |= elements.Ref(2 << 59)
-
-	}
+    
 
 	bb := quadtree.NullBbox()
 	for _, cc := range coords[0] {
 		expandBbox(bb, cc)
 	}
-	return &multiGeometryImpl{gp.ChangeType(), i, gp.Info(), tg, gp.Quadtree(), coords, zorder, area, bb}
+	return &multiGeometryImpl{gp.ChangeType(), i, gp.Info(), tg, gp.Quadtree(), ot, coords, zorder, area, bb}
 }
 
 func (pt *pointGeometryImpl) Type() elements.ElementType      { return elements.Geometry }
@@ -187,6 +174,12 @@ func (pt *pointGeometryImpl) Id() elements.Ref      { return pt.id }
 func (ln *linestringGeometryImpl) Id() elements.Ref { return ln.id }
 func (py *polygonGeometryImpl) Id() elements.Ref    { return py.id }
 func (mg *multiGeometryImpl) Id() elements.Ref      { return mg.id }
+
+func (pt *pointGeometryImpl) OriginalType() elements.ElementType      { return pt.ot }
+func (ln *linestringGeometryImpl) OriginalType() elements.ElementType { return ln.ot }
+func (py *polygonGeometryImpl) OriginalType() elements.ElementType    { return py.ot }
+func (mg *multiGeometryImpl) OriginalType() elements.ElementType      { return mg.ot }
+
 
 func (pt *pointGeometryImpl) Info() elements.Info      { return pt.info }
 func (ln *linestringGeometryImpl) Info() elements.Info { return ln.info }
@@ -346,15 +339,15 @@ func (ln *linestringGeometryImpl) GeometryType() GeometryType { return Linestrin
 func (py *polygonGeometryImpl) GeometryType() GeometryType    { return Polygon }
 func (mg *multiGeometryImpl) GeometryType() GeometryType      { return Multi }
 
-func (pt *pointGeometryImpl) GeometryData() []byte { return packPointData(pt.coord) }
+func (pt *pointGeometryImpl) GeometryData() []byte { return packPointData(pt.ot, pt.coord) }
 func (ln *linestringGeometryImpl) GeometryData() []byte {
-	return packLinestringData(ln.coords, ln.zorder, ln.bbox)
+	return packLinestringData(ln.ot, ln.coords, ln.zorder, ln.bbox)
 }
 func (py *polygonGeometryImpl) GeometryData() []byte {
-	return packPolygonData(py.coords, py.zorder, py.area, py.bbox)
+	return packPolygonData(py.ot, py.coords, py.zorder, py.area, py.bbox)
 }
 func (mg *multiGeometryImpl) GeometryData() []byte {
-	return packMultiGeometryData(mg.coords, mg.zorder, mg.area, mg.bbox)
+	return packMultiGeometryData(mg.ot, mg.coords, mg.zorder, mg.area, mg.bbox)
 }
 
 func (pt *pointGeometryImpl) Bbox() quadtree.Bbox {
@@ -387,13 +380,13 @@ func (pt *pointGeometryImpl) String() string {
 	return fmt.Sprintf("Point %8d %.20s", pt.id, pt.AsWkt(false))
 }
 func (ln *linestringGeometryImpl) String() string {
-	return fmt.Sprintf("Linestring %8d %.20s", ln.id&0xffffffffffff, ln.AsWkt(false))
+	return fmt.Sprintf("Linestring %8d %.20s", ln.id, ln.AsWkt(false))
 }
 func (py *polygonGeometryImpl) String() string {
-	return fmt.Sprintf("Polygon %8d %.20s", py.id&0xffffffffffff, py.AsWkt(false))
+	return fmt.Sprintf("Polygon %8d %.20s", py.id, py.AsWkt(false))
 }
 func (mg *multiGeometryImpl) String() string {
-	return fmt.Sprintf("MultiGeometry %8d %.20s", mg.id&0xffffffffffff, mg.AsWkt(false))
+	return fmt.Sprintf("MultiGeometry %8d %.20s", mg.id, mg.AsWkt(false))
 }
 
 func coordGeo(coord Coord, asMerc bool) []float64 {

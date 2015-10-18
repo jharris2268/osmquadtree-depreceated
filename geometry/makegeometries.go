@@ -108,7 +108,7 @@ func MakeGeometries(inc <-chan elements.ExtendedBlock, tagsFilter map[string]Tag
 					fn := e.(elements.FullNode)
 					ok := nodeTags(fn.Tags().(TagsEditable), tagsFilter)
 					if ok {
-						nb = append(nb, makePointGeometry(fn, fn.Tags(), coordImpl{fn.Id(), fn.Lon(), fn.Lat()}))
+						nb = append(nb, makePointGeometry(fn, elements.Node, fn.Tags(), coordImpl{fn.Id(), fn.Lon(), fn.Lat()}))
 					}
 				case elements.Way:
 					fw := e.(elements.FullWay)
@@ -124,9 +124,9 @@ func MakeGeometries(inc <-chan elements.ExtendedBlock, tagsFilter map[string]Tag
 					if isp {
 						p := [][]Coord{cc}
 						ar, _ := calculate_polygon_area(p)
-						nb = append(nb, makePolygonGeometry(fw, fw.Tags(), p, zo, ar))
+						nb = append(nb, makePolygonGeometry(fw, elements.Way, fw.Tags(), p, zo, ar))
 					} else {
-						nb = append(nb, makeLinestringGeometry(fw, fw.Tags(), cc, zo))
+						nb = append(nb, makeLinestringGeometry(fw, elements.Way, fw.Tags(), cc, zo))
 					}
 
 				default:
@@ -218,8 +218,9 @@ func HandleRelations(inc <-chan elements.ExtendedBlock, tagsFilter map[string]Ta
 					}
 
 				case elements.Geometry:
-					if e.Id()>>59 == 1 {
-						ei := e.Id() & 0xffffffffffff
+                    g,err := ExtractGeometry(e)
+                    if err==nil && g.OriginalType() == elements.Way {
+						ei := e.Id()
 						if _, ok := wayp[ei]; ok {
 							rb = append(rb, e)
 							delete(wayp, ei)
@@ -586,9 +587,9 @@ func finishRel(ways *pendingEleMap, rel *pendingEle, tagsFilter map[string]TagTe
 	}
 
 	if len(groups) == 1 {
-		finished = append(finished, makePolygonGeometry(ele, rt, groups[0], zo, ar))
+		finished = append(finished, makePolygonGeometry(ele, elements.Relation, rt, groups[0], zo, ar))
 	} else {
-		finished = append(finished, makeMultiGeometry(ele, rt, groups, zo, ar))
+		finished = append(finished, makeMultiGeometry(ele, elements.Relation, rt, groups, zo, ar))
 	}
 
 	//log.Println(wo,ele.Id(),rt,len(groups),len(outerChecked),len(innerChecked),zo,isp)
@@ -647,7 +648,7 @@ func finishRelations(
 				}
 			case elements.Geometry:
 
-				ei := e.Id() & 0xffffffffffff
+				ei := e.Id()
 
 				if _, ok := ways[ei]; !ok {
 					//log.Println("Not needed?", e)

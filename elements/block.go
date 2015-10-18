@@ -49,9 +49,25 @@ func (bo ByElementId) Less(i, j int) bool {
 }
 
 func compGeom(l Element, r Element) bool {
+    lfg,ok := l.(interface{ OriginalType() ElementType })
+    if ok {
+        rfg,ok := r.(interface{ OriginalType() ElementType })
+        if ok {
+            if lfg.OriginalType()!=rfg.OriginalType() {
+                return lfg.OriginalType() < rfg.OriginalType()
+            }
+        }
+    }
+    if l.Id() != r.Id() {
+        return l.Id() < r.Id()
+    }
+    
     lfe,ok := l.(FullElement)
     if ok {
+        
+        
         rfe,ok := r.(FullElement)
+        
         if ok {
             return compTags(lfe.Tags(), rfe.Tags())
         }
@@ -75,7 +91,7 @@ func compTags(lt Tags, rt Tags) bool {
 
 func Less(l Element, r Element) bool {
 	if l.Type() == r.Type() {
-        if l.Type() == Geometry && l.Id()==r.Id() {
+        if l.Type() == Geometry {
             return compGeom(l, r)
         }
 		return l.Id() < r.Id()

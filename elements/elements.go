@@ -25,6 +25,7 @@ const (
 	Way
 	Relation
 	Geometry
+    None
 )
 
 func (et ElementType) String() string {
@@ -198,7 +199,8 @@ type FullRelation interface {
 type PackedGeometry interface {
 	FullElement
 
+    
 	// GeometryData returns a []byte containing the protocol buffers
 	// serialized geometry data
-	GeometryData() []byte
+    GeometryData() []byte
 }

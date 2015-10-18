@@ -77,6 +77,8 @@ func MakeFeature(o geometry.Geometry, asMerc bool) (map[string]interface{}, erro
 	om := map[string]interface{}{}
 	om["type"] = "Feature"
 	om["id"] = o.Id()
+    om["origtype"] = o.OriginalType().String()[:1]
+    
 	pp := map[string]interface{}{}
 	tt := o.Tags()
 	for j := 0; j < tt.Len(); j++ {
