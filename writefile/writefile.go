@@ -55,9 +55,9 @@ func (bi blockIdx) Quadtree(i int) quadtree.Quadtree { return bi[i].Quadtree }
 func (bi blockIdx) IsChange(i int) bool              { return bi[i].Isc }
 func (bi blockIdx) BlockLen(i int) int64             { return bi[i].Len }
 
-func addQtBlock(bl elements.ExtendedBlock, idxoff int) (utils.Idxer, error) {
+func addQtBlock(bl elements.ExtendedBlock, idxoff int, qttup bool) (utils.Idxer, error) {
 
-	a, err := write.WriteExtendedBlock(bl, false, true)
+	a, err := write.WriteExtendedBlock(bl, false, true, qttup)
 	if err != nil {
 		return nil, err
 	}
@@ -68,8 +68,8 @@ func addQtBlock(bl elements.ExtendedBlock, idxoff int) (utils.Idxer, error) {
 	return &idxData{bl.Idx() - idxoff, b, quadtree.Null}, nil
 }
 
-func addFullBlock(bl elements.ExtendedBlock, idxoff int, isc bool, bh []byte) (utils.Idxer, error) {
-	a, err := write.WriteExtendedBlock(bl, isc, true)
+func addFullBlock(bl elements.ExtendedBlock, idxoff int, isc bool, qttup bool, bh []byte) (utils.Idxer, error) {
+	a, err := write.WriteExtendedBlock(bl, isc, true, qttup)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func addFullBlock(bl elements.ExtendedBlock, idxoff int, isc bool, bh []byte) (u
 }
 
 func addOrigBlock(bl elements.ExtendedBlock, bh []byte) (utils.Idxer, error) {
-	a, err := write.WriteExtendedBlock(bl, false, false)
+	a, err := write.WriteExtendedBlock(bl, false, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +152,7 @@ func finishAndHeader(outf io.Writer, tf io.ReadWriter, ii []IdxItem, isc bool) (
 
 }
 
-func WritePbfFile(inc []chan elements.ExtendedBlock, outfn string, isc bool) (write.BlockIdxWrite, error) {
+func WritePbfFile(inc []chan elements.ExtendedBlock, outfn string, isc bool, qttup bool) (write.BlockIdxWrite, error) {
 	outf, err := os.Create(outfn)
 	if err != nil {
 		return nil, err
@@ -168,13 +168,13 @@ func WritePbfFile(inc []chan elements.ExtendedBlock, outfn string, isc bool) (wr
 		tf.Close()
 		os.Remove(tf.Name())
 	}()
-	return WritePbfIndexed(inc, outf, tf, true, isc, false)
+	return WritePbfIndexed(inc, outf, tf, true, isc, false, qttup)
 }
 
-func WritePbfIndexed(inc []chan elements.ExtendedBlock, outf io.Writer, tf io.ReadWriter, indexed bool, ischange bool, plain bool) (write.BlockIdxWrite, error) {
+func WritePbfIndexed(inc []chan elements.ExtendedBlock, outf io.Writer, tf io.ReadWriter, indexed bool, ischange bool, plain bool, qttup bool) (write.BlockIdxWrite, error) {
 
 	addBl := func(bl elements.ExtendedBlock, i int) (utils.Idxer, error) {
-		return addFullBlock(bl, i, ischange, []byte("OSMData"))
+		return addFullBlock(bl, i, ischange, qttup, []byte("OSMData"))
 	}
 
 	if !indexed {
@@ -220,13 +220,17 @@ func checkprogress(cc chan IdxItem, ll int) {
 	log.Printf("\n")
 }
 
-func WriteQts(inc <-chan elements.ExtendedBlock, outfn string) error {
+func WriteQts(inc <-chan elements.ExtendedBlock, outfn string, qttup bool) error {
 	outf, err := os.Create(outfn)
 	if err != nil {
 		return err
 	}
 	defer outf.Close()
-	_, err = WriteBlocksOrdered(readfile.SplitExtendedBlockChans(inc, 4), outf, addQtBlock, false)
+    aqb := func(bl elements.ExtendedBlock, idxoff int) (utils.Idxer, error) {
+        return addQtBlock(bl,idxoff,qttup)
+    }
+    
+	_, err = WriteBlocksOrdered(readfile.SplitExtendedBlockChans(inc, 4), outf, aqb, false)
 	return err
 }
 

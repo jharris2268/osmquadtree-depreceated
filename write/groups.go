@@ -76,14 +76,14 @@ func dropNils(bl elements.Block) elements.Block {
 	return bl
 }
 
-func packBlock(bl elements.Block, stm map[string]int, ischange bool, writeExtra bool) (utils.PbfMsgSlice, error) {
+func packBlock(bl elements.Block, stm map[string]int, ischange bool, writeExtra bool, qttup bool) (utils.PbfMsgSlice, error) {
 	bl2 := dropNils(bl)
 
 	ss := groupElements(bl2, ischange)
 	ans := make(utils.PbfMsgSlice, 0, len(ss)+10)
 
 	for i, s := range ss {
-		pg, err := packGroup(bl2, stm, s.f, s.t, s.ct, writeExtra)
+		pg, err := packGroup(bl2, stm, s.f, s.t, s.ct, writeExtra, qttup)
 		if err != nil {
 			return nil, err
 		}
@@ -105,7 +105,7 @@ func denseTags(tags elements.Tags, stm map[string]int, kvs []uint64) []uint64 {
 	return kvs
 }
 
-func packGroup(bl elements.Block, stm map[string]int, from int, to int, ct elements.ChangeType, writeExtra bool) ([]byte, error) {
+func packGroup(bl elements.Block, stm map[string]int, from int, to int, ct elements.ChangeType, writeExtra bool, qttup bool) ([]byte, error) {
 	l := 1
 	if bl.Element(from).Type() != elements.Node {
 		l = bl.Len()
@@ -117,7 +117,7 @@ func packGroup(bl elements.Block, stm map[string]int, from int, to int, ct eleme
 	mm := make(utils.PbfMsgSlice, 0, l)
 
 	if bl.Element(from).Type() == elements.Node {
-		dd, err := packDense(bl, stm, from, to, writeExtra)
+		dd, err := packDense(bl, stm, from, to, writeExtra, qttup)
 		if err != nil {
 			return nil, err
 		}
@@ -125,7 +125,7 @@ func packGroup(bl elements.Block, stm map[string]int, from int, to int, ct eleme
 	} else {
 		for i := from; i < to; i++ {
 			e := bl.Element(i)
-			t, pp, err := packElement(e, stm, writeExtra)
+			t, pp, err := packElement(e, stm, writeExtra, qttup)
 			if err != nil {
 				return nil, err
 			}
@@ -145,19 +145,19 @@ func getStringI(s string, stm map[string]int) int64 {
 	return int64(a)
 }
 
-func packDense(bl elements.Block, stm map[string]int, from int, to int, writeExtra bool) ([]byte, error) {
+func packDense(bl elements.Block, stm map[string]int, from int, to int, writeExtra bool, qttup bool) ([]byte, error) {
 
 	mki := func() []int64 { return make([]int64, to-from) }
 	mku := func() []uint64 { return make([]uint64, to-from) }
 
-	ii, /*qt,*/ ln, lt := mki(), /*mki(),*/ mki(), mki()
-    qx,qy,qz := mki(), mki(), mki()
+	ii, ln, lt, qt := mki(),  mki(), mki(), mki()
+    
 	kvs := make([]uint64, 0, (to-from)*5)
 	i_vs, i_ts, i_cs, i_ui, i_us, i_vv := mku(), mki(), mki(), mki(), mki(), mku()
 	all_visible := true
 	if !writeExtra {
-		//qt = nil
-        qx = nil
+		qt = nil
+        
 	}
 
 	for i, _ := range ii {
@@ -168,16 +168,16 @@ func packDense(bl elements.Block, stm map[string]int, from int, to int, writeExt
 		}
 
 		ii[i] = int64(e.Id())
-		if writeExtra && (i == 0 || /*qt*/qx != nil) {
+		if writeExtra && (i == 0 || qt != nil) {
 			q, ok := e.(interface {
 				Quadtree() quadtree.Quadtree
 			})
 			if ok {
-                qx[i],qy[i],qz[i] = q.Quadtree().Tuple()
-				//qt[i] = int64(q.Quadtree())
+                //qx[i],qy[i],qz[i] = q.Quadtree().Tuple()
+				qt[i] = int64(q.Quadtree())
 			} else {
-				//qt = nil
-                qx,qy,qz = nil,nil,nil
+				qt = nil
+                //qx,qy,qz = nil,nil,nil
 			}
 		}
 		if i == 0 || ln != nil {
@@ -264,25 +264,33 @@ func packDense(bl elements.Block, stm map[string]int, from int, to int, writeExt
 		kvsp, _ := utils.PackPackedList(kvs)
 		msgs = append(msgs, utils.PbfMsg{10, kvsp, 0})
 	}
-	/*if qt != nil {
-		qtp, _ := utils.PackDeltaPackedList(qt)
-		msgs = append(msgs, utils.PbfMsg{20, qtp, 0})
-	}*/
-    if qx != nil {
-		qtp, _ := utils.PackDeltaPackedList(qx)
-		msgs = append(msgs, utils.PbfMsg{21, qtp, 0})
-        
-        qtp, _ = utils.PackDeltaPackedList(qy)
-		msgs = append(msgs, utils.PbfMsg{22, qtp, 0})
-        
-        qtp, _ = utils.PackDeltaPackedList(qz)
-		msgs = append(msgs, utils.PbfMsg{23, qtp, 0})
+	if qt != nil {
+        if qttup {
+            qx := make([]int64,len(qt))
+            qy := make([]int64,len(qt))
+            qz := make([]int64,len(qt))
+            for i,q:=range qt {
+                qx[i],qy[i],qz[i] = quadtree.Quadtree(q).Tuple()
+            }
+            qtp, _ := utils.PackDeltaPackedList(qx)
+            msgs = append(msgs, utils.PbfMsg{21, qtp, 0})
+            
+            qtp, _ = utils.PackDeltaPackedList(qy)
+            msgs = append(msgs, utils.PbfMsg{22, qtp, 0})
+            
+            qtp, _ = utils.PackDeltaPackedList(qz)
+            msgs = append(msgs, utils.PbfMsg{23, qtp, 0})
+        } else {
+            
+            qtp, _ := utils.PackDeltaPackedList(qt)
+            msgs = append(msgs, utils.PbfMsg{20, qtp, 0})
+        }
 	}
-    
+        
 	return msgs.Pack(), nil
 }
 
-func packElement(e elements.Element, stm map[string]int, writeExtra bool) (uint64, []byte, error) {
+func packElement(e elements.Element, stm map[string]int, writeExtra bool, qttup bool) (uint64, []byte, error) {
 
 	msgs := make(utils.PbfMsgSlice, 0, 8)
 	msgs = append(msgs, utils.PbfMsg{1, nil, uint64(e.Id())})
@@ -322,9 +330,13 @@ func packElement(e elements.Element, stm map[string]int, writeExtra bool) (uint6
 		qt, ok := e.(interface {
 			Quadtree() quadtree.Quadtree
 		})
-		if ok { //&& qt.Quadtree() != quadtree.Null {
-			//msgs = append(msgs, utils.PbfMsg{20, nil, utils.Zigzag(int64(qt.Quadtree()))})
-            msgs = append(msgs, utils.PbfMsg{21, packQuadtree(qt.Quadtree()), 0})
+		if ok && qt.Quadtree() != quadtree.Null {
+            if qttup {
+                msgs = append(msgs, utils.PbfMsg{21, packQuadtree(qt.Quadtree()), 0})
+            } else {
+                msgs = append(msgs, utils.PbfMsg{20, nil, utils.Zigzag(int64(qt.Quadtree()))})
+            }
+            
 		}
 	}
 

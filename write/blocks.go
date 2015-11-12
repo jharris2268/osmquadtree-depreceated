@@ -70,12 +70,12 @@ func packStringTable(stm map[string]int) ([]byte, error) {
 //primitive block. If ischange is true, write changetypes; if writeExtra
 //is true write extra block attributes (quadtree, startdate, enddate and
 //tags, if present), and also write element quadtrees.
-func WriteExtendedBlock(block elements.ExtendedBlock, ischange bool, writeExtra bool) ([]byte, error) {
+func WriteExtendedBlock(block elements.ExtendedBlock, ischange bool, writeExtra bool, qttup bool) ([]byte, error) {
 
 	stm := map[string]int{"!!!ZZtrt": 0} //nonsense value stringtable starts at 1
 	//n.b. an empty string might be a real value
 
-	msgs, err := packBlock(block, stm, ischange, writeExtra)
+	msgs, err := packBlock(block, stm, ischange, writeExtra,qttup)
 
 	if err != nil {
 		return nil, err

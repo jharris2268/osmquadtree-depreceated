@@ -55,13 +55,15 @@ func (rl RouteList) Proc(tt TagsEditable, ss []string) bool {
 	for _, s := range ss {
 		sm[s] = true
 	}
+    
 	ss = make([]string, 0, len(sm))
 	for s, _ := range sm {
 		ss = append(ss, s)
+        
 	}
 
 	sort.Strings(ss)
-
+    
 	tt.Put(string(rl), strings.Join(ss, ";"))
 	return true
 }
@@ -100,6 +102,7 @@ func AddRelationRange(inc <-chan elements.ExtendedBlock, testRel func(TagsEditab
 					if testRel(tt) && tt.Has(srctag) {
                         nrls++
 						v := tt.Get(srctag)
+                        
 						for j := 0; j < fr.Len(); j++ {
 							if fr.MemberType(j) == elements.Way {
 								w := fr.Ref(j)
@@ -132,12 +135,13 @@ func AddRelationRange(inc <-chan elements.ExtendedBlock, testRel func(TagsEditab
 						if !ok {
 							panic("unconverted tags")
 						}
-						proc(tt, p.s)
+                        
+                        proc(tt, p.s)
 						delete(ss, e.Id())
-
-						nb = append(nb, fw)
+                        nb = append(nb, fw)
                         nsnt++
 					} else {
+                        
 						nb = append(nb, e)
 					}
 				default:
@@ -147,15 +151,19 @@ func AddRelationRange(inc <-chan elements.ExtendedBlock, testRel func(TagsEditab
 			res <- elements.MakeExtendedBlock(idx, nb, bq, bl.StartDate(), bl.EndDate(), nil)
 			idx++
 
+            /*
+            not working properly??
 			ds := make([]elements.Ref, 0, len(ss))
 			for k, v := range ss {
 				if bq.Common(v.q) != v.q {
 					ds = append(ds, k)
 				}
 			}
+            
 			for _, k := range ds {
-				delete(ss, k)
+                delete(ss, k)
 			}
+            */
 		}
         fmt.Printf("read %d rels, %d ways; wrote %d ways\n", nrls, nwys, nsnt)
 		close(res)
