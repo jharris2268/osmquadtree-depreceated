@@ -96,6 +96,7 @@ type UpdateSettings struct {
 	RoundTime      bool
 	LocationsCache string
     QuadtreeTuple  bool
+    IncludeUnchangedNodes bool
 }
 
 const DefaultSource = string("http://planet.openstreetmap.org/replication/day/")
@@ -105,7 +106,7 @@ func GetUpdateSettings(prfx string) (UpdateSettings, error) {
 	if err != nil {
 		_, _, err2 := GetCacheSpecsLevelDb(prfx)
 		if err2 == nil {
-			return UpdateSettings{"", "", 0, true, "leveldb",false}, nil
+			return UpdateSettings{"", "", 0, true, "leveldb",false,false}, nil
 		} else {
 			return UpdateSettings{}, err
 		}

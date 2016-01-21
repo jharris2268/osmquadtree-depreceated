@@ -47,6 +47,20 @@ func expandBbox(bx *quadtree.Bbox, cc []Coord) *quadtree.Bbox {
 	return bx
 }
 
+func makeBboxLL(wp elements.WayPoints) *quadtree.Bbox {
+	bx := quadtree.NullBbox()
+	return expandBboxLL(bx, wp)
+}
+
+func expandBboxLL(bx *quadtree.Bbox, wp elements.WayPoints) *quadtree.Bbox {
+	for i:=0; i < wp.Len(); i++ {
+        ln,lt:=wp.LonLat(i)
+		bx.ExpandXY(ln,lt)
+	}
+	return bx
+}
+
+
 type pointGeometryImpl struct {
 	ct   elements.ChangeType
 	id   elements.Ref
@@ -274,7 +288,7 @@ func writeXY(ans []byte, p int, c Coord, prj bool) ([]byte, int) {
 	}
 
 	utils.WriteFloat64(ans, p, x)
-	utils.WriteFloat64(ans, p+8, x)
+	utils.WriteFloat64(ans, p+8, y)
 	return ans, p + 16
 }
 
@@ -290,16 +304,53 @@ func ringWkb(cc []Coord, prj bool) []byte {
 func (pt *pointGeometryImpl) AsWkb(prj bool) []byte {
 	return append([]byte{0, 0, 0, 0, 1}, ptWkb(pt.coord, prj)...)
 }
+
+func (pt *pointGeometryImpl) AsWkbPostgis(prj bool) [][]byte {
+    g := make([]byte, 9)
+    utils.WriteInt32(g, 1, int32(1 + (1<<29)))
+    if prj {
+        utils.WriteInt32(g, 5, 900913)
+    } else {
+        utils.WriteInt32(g, 5, 4326)
+    }
+    return [][]byte{append(g, ptWkb(pt.coord, prj)...)}
+}
+
+
 func (ln *linestringGeometryImpl) AsWkb(prj bool) []byte {
 	return LinestringWkb(ln.coords, prj)
 }
+
+func (ln *linestringGeometryImpl) AsWkbPostgis(prj bool) [][]byte {
+    g := make([]byte, 9)
+    utils.WriteInt32(g, 1, int32(2 + (1<<29)))
+    if prj {
+        utils.WriteInt32(g, 5, 900913)
+    } else {
+        utils.WriteInt32(g, 5, 4326)
+    }
+    return [][]byte{append(g, ringWkb(ln.coords, prj)...)}
+}
+
 
 func LinestringWkb(cc []Coord, prj bool) []byte {
 	return append([]byte{0, 0, 0, 0, 2}, ringWkb(cc, prj)...)
 }
 
 func (py *polygonGeometryImpl) AsWkb(prj bool) []byte {
-	return append([]byte{0}, polyWkb(py.coords, prj)...)
+	return append([]byte{0}, polyWkb(py.coords, prj, true)...)
+}
+
+
+func (py *polygonGeometryImpl) AsWkbPostgis(prj bool) [][]byte {
+    g := make([]byte, 9)
+    utils.WriteInt32(g, 1, int32(3 + (1<<29)))
+    if prj {
+        utils.WriteInt32(g, 5, 900913)
+    } else {
+        utils.WriteInt32(g, 5, 4326)
+    }
+    return [][]byte{append(g, polyWkb(py.coords, prj, false)...)}
 }
 
 func joinArr(aa [][]byte) []byte {
@@ -316,11 +367,16 @@ func joinArr(aa [][]byte) []byte {
 	return res
 }
 
-func polyWkb(ccs [][]Coord, prj bool) []byte {
-	rr := make([][]byte, len(ccs)+1)
-	rr[0] = []byte{0, 0, 0, 3}
-	for i, cc := range ccs {
-		rr[i+1] = ringWkb(cc, prj)
+func polyWkb(ccs [][]Coord, prj bool, header bool) []byte {
+	rr := make([][]byte, 0, len(ccs)+2)
+    if header {
+        rr = append(rr, []byte{0, 0, 0, 3})
+    }
+    nr := []byte{0,0,0,0}
+    utils.WriteInt32(nr,0,int32(len(ccs)))
+    rr=append(rr,nr)
+	for _, cc := range ccs {
+        rr=append(rr, ringWkb(cc, prj) )
 	}
 	return joinArr(rr)
 }
@@ -329,9 +385,26 @@ func (mg *multiGeometryImpl) AsWkb(prj bool) []byte {
 	rr := make([][]byte, len(mg.coords)+1)
 	rr[0] = []byte{0, 0, 0, 7}
 	for i, cc := range mg.coords {
-		rr[i+1] = polyWkb(cc, prj)
+		rr[i+1] = polyWkb(cc, prj, true)
 	}
 	return joinArr(rr)
+}
+
+func (mg *multiGeometryImpl) AsWkbPostgis(prj bool) [][]byte {
+    ans := make([][]byte, 0, len(mg.coords))
+    
+    for _, cc:=range mg.coords {
+    
+        g := make([]byte, 9)
+        utils.WriteInt32(g, 1, int32(3 + (1<<29)))
+        if prj {
+            utils.WriteInt32(g, 5, 900913)
+        } else {
+            utils.WriteInt32(g, 5, 4326)
+        }
+        ans=append(ans, append(g, polyWkb(cc, prj, false)...))
+    }
+    return ans
 }
 
 func (pt *pointGeometryImpl) GeometryType() GeometryType      { return Point }

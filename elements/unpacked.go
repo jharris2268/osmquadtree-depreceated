@@ -134,6 +134,68 @@ func (fn *fullWay) String() string {
 	return fmt.Sprintf("FullWay: %-10d [%-10d refs]%s", fn.id, len(fn.refs), exStr(fn.qt, fn.ct))
 }
 
+type fullWayPoints struct {
+	id   Ref
+	ct   ChangeType
+	qt   quadtree.Quadtree
+	refs []Ref
+
+	info Info
+	tags Tags
+    
+    lons, lats []int64
+}
+
+func (fn *fullWayPoints) Type() ElementType {
+	return Way
+}
+func (fn *fullWayPoints) ChangeType() ChangeType {
+	return fn.ct
+}
+
+func (fn *fullWayPoints) Id() Ref {
+	return fn.id
+}
+func (fn *fullWayPoints) Quadtree() quadtree.Quadtree {
+	return fn.qt
+}
+func (fn *fullWayPoints) Info() Info {
+	return fn.info
+}
+
+func (fn *fullWayPoints) Tags() Tags {
+	return fn.tags
+}
+
+func (fn *fullWayPoints) Len() int {
+	return len(fn.refs)
+}
+
+func (fn *fullWayPoints) Ref(i int) Ref {
+	return fn.refs[i]
+}
+
+func (fn *fullWayPoints) LonLat(i int) (int64,int64) {
+	return fn.lons[i],fn.lats[i]
+}
+
+func MakeWayPoints(id Ref, info Info, tags Tags,
+	refs []Ref, lons []int64, lats []int64,
+	qt quadtree.Quadtree, change ChangeType) FullWayPoints {
+
+	return &fullWayPoints{id, change, qt, refs, info, tags,lons,lats}
+}
+
+func (fn *fullWayPoints) Pack() []byte {
+	return PackFullElement(fn, PackWayPoints(fn))
+	//return PackElement(Way,fn.ct,fn.id,fn.qt,packRefs(fn.refs), fn.info.Pack(), fn.tags.Pack())
+}
+
+func (fn *fullWayPoints) String() string {
+	return fmt.Sprintf("FullWayPoints: %-10d [%-10d refs]%s", fn.id, len(fn.refs), exStr(fn.qt, fn.ct))
+}
+
+
 type relMember struct {
 	memType ElementType
 	ref     Ref
@@ -342,6 +404,10 @@ func (fn *fullWay) SetQuadtree(q quadtree.Quadtree) {
 	fn.qt = q
 }
 
+func (fn *fullWayPoints) SetQuadtree(q quadtree.Quadtree) {
+	fn.qt = q
+}
+
 func (fn *fullRelation) SetQuadtree(q quadtree.Quadtree) {
 	fn.qt = q
 }
@@ -357,6 +423,10 @@ func (fn *fullWay) SetChangeType(ct ChangeType) {
 	fn.ct = ct
 }
 
+func (fn *fullWayPoints) SetChangeType(ct ChangeType) {
+	fn.ct = ct
+}
+
 func (fn *fullRelation) SetChangeType(ct ChangeType) {
 	fn.ct = ct
 }
@@ -366,5 +436,9 @@ func (fn *packedGeometry) SetChangeType(ct ChangeType) {
 }
 
 func (fn *packedGeometry) SetTags(tags Tags) {
+	fn.tags = tags
+}
+
+func (fn *fullWayPoints) SetTags(tags Tags) {
 	fn.tags = tags
 }

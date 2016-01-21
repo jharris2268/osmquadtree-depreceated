@@ -355,6 +355,11 @@ func packElement(e elements.Element, stm map[string]int, writeExtra bool, qttup 
 			rrp := packRefs(rr)
 			msgs = append(msgs, utils.PbfMsg{8, rrp, 0})
 		}
+        wp,ok := e.(elements.WayPoints)
+        if ok {
+            lns,lts := packLonLats(wp)
+            msgs = append(msgs, utils.PbfMsg{12, lns, 0}, utils.PbfMsg{13, lts, 0})
+        }
 		msgs.Sort()
 		return 3, msgs.Pack(), nil
 	case elements.Relation:
@@ -392,6 +397,15 @@ func packRefs(rr elements.Refs) []byte {
 	}
 	pp, _ := utils.PackDeltaPackedList(ii)
 	return pp
+}
+func packLonLats(wp elements.WayPoints) ([]byte,[]byte) {
+    lns, lts := make([]int64, wp.Len()), make([]int64, wp.Len())
+    for i, _ := range lns {
+		lns[i],lts[i] = wp.LonLat(i)
+	}
+	lnsp, _ := utils.PackDeltaPackedList(lns)
+    ltsp, _ := utils.PackDeltaPackedList(lts)
+	return lnsp,ltsp
 }
 
 func packMembers(mm elements.Members, stm map[string]int) ([]byte, []byte, []byte) {

@@ -203,12 +203,21 @@ func AsNormalBlock(block Block) Block {
 }
 
 func AsNormal(element Element) Element {
-	if element.ChangeType() == 0 {
+	if element.ChangeType() == Normal {
 		return element
 	}
-
+	
+	setChangeType,ok := element.(interface{
+		SetChangeType(ChangeType)
+	})
+	if ok {
+		setChangeType.SetChangeType(Normal)
+		return element
+	}
+	
+	
 	switch element.(type) {
-	case *fullNode:
+	/*case *fullNode:
 		fn := element.(*fullNode)
 		fn.ct = 0
 		return fn
@@ -223,13 +232,14 @@ func AsNormal(element Element) Element {
 	case *packedGeometry:
 		fn := element.(*packedGeometry)
 		fn.ct = 0
-		return fn
+		return fn*/
+		
 	case PackedElement:
 		fn := element.(PackedElement)
 		fn[1] = 0
 		return fn
 	}
-
+	fmt.Println("??",element)
 	e := UnpackElement(element.Pack())
 	return AsNormal(e)
 }

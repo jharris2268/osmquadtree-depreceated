@@ -194,6 +194,29 @@ func PackRefs(nn Refs) []byte {
 	return res[:p]
 }
 
+func PackWayPoints(nn WayPoints) []byte {
+	res := make([]byte, 30*(1+nn.Len()))
+	p := utils.WriteVarint(res, 0, int64(nn.Len())) //number of node refs
+	s := Ref(0)
+	for i := 0; i < nn.Len(); i++ {
+		p = utils.WriteVarint(res, p, int64(nn.Ref(i)-s)) // delta packed
+		s = nn.Ref(i)
+	}
+    
+    p = utils.WriteVarint(res, p, int64(nn.Len())) //number of node refs
+	ln,lt:=int64(0),int64(0)
+	for i := 0; i < nn.Len(); i++ {
+        a,b := nn.LonLat(i)
+		p = utils.WriteVarint(res, p, int64(a-ln)) // delta packed
+		ln = a
+        p = utils.WriteVarint(res, p, int64(b-lt)) // delta packed
+		lt = b
+	}
+    
+
+	return res[:p]
+}
+
 func PackRefSlice(nn []Ref) []byte {
 	res := make([]byte, 10*(1+len(nn)))
 	p := utils.WriteVarint(res, 0, int64(len(nn)))
@@ -206,13 +229,13 @@ func PackRefSlice(nn []Ref) []byte {
 	return res[:p]
 }
 
-func unpackRefs(buf []byte) []Ref {
+func unpackRefs(buf []byte) ([]Ref,int) {
 	if len(buf) == 0 {
-		return nil
+		return nil,0
 	}
 	l, p := utils.ReadVarint(buf, 0)
 	if l < 0 || l == 0 && len(buf) > p {
-		return nil
+		return nil,0
 	}
 	ans := make([]Ref, l)
 	n, np := int64(0), int64(0)
@@ -223,8 +246,31 @@ func unpackRefs(buf []byte) []Ref {
 		ans[i] = Ref(n)
 	}
 
-	return ans
+	return ans, p
 
+}
+
+func unpackLonsLats(buf []byte) ([]int64, []int64) {
+    
+    if len(buf) == 0 {
+		return nil,nil
+	}
+	l, p := utils.ReadVarint(buf, 0)
+	if l < 0 || l == 0 && len(buf) > p {
+		return nil,nil
+	}
+	lons,lats := make([]int64, l), make([]int64, l)
+    ln,lt, nln,nlt := int64(0), int64(0), int64(0), int64(0)
+    
+    for i := 0; i < int(l); i++ {
+		nln, p = utils.ReadVarint(buf, p)
+		ln += nln
+        nlt, p = utils.ReadVarint(buf, p)
+		lt += nlt
+		lons[i] = ln
+        lats[i] = lt
+	}
+    return lons,lats
 }
 
 func PackMembers(mm Members) []byte {
@@ -335,7 +381,12 @@ func UnpackElement(buf []byte) FullElement {
 
 		refs := []Ref{}
 		if dt != nil {
-			refs = unpackRefs(dt)
+            pos := 0
+			refs,pos = unpackRefs(dt)
+            if pos < len(dt) {
+                lons,lats := unpackLonsLats(dt[pos:])
+                return &fullWayPoints{id,ct, qt, refs, info, tags, lons,lats}
+            }
 		}
 		return &fullWay{id, ct, qt, refs, info, tags}
 	case Relation:
@@ -377,7 +428,7 @@ func UnpackQtRefs(buf []byte) (ElementType, ChangeType, Ref, quadtree.Quadtree, 
 
 		case Way:
 
-			refs = unpackRefs(dt)
+			refs,_ = unpackRefs(dt)
 
 		case Relation:
 			mems := unpackMembers(dt)

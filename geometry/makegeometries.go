@@ -11,13 +11,34 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	//"sync"
-
+	
+    "encoding/json"
+    
 	"github.com/jharris2268/osmquadtree/elements"
 	"github.com/jharris2268/osmquadtree/quadtree"
 	//"time"
 	//"runtime/debug"
 )
+
+func addOtherTags(tags TagsEditable, rms []string, storetype string) {
+    if tags.Has("other_tags") {
+        rms=append(rms, "other_tags")
+    }
+    
+    if storetype=="json"{
+        mm := map[string]string{}
+        for _,t := range rms {
+            mm[t]=tags.Get(t)
+        }
+        mms,err := json.Marshal(mm)
+        if err!=nil {
+            fmt.Println("??", mm)
+            return
+        }
+        tags.Put("other_tags", string(mms))
+    }   
+    
+}
 
 func nodeTags(tags TagsEditable, tagsFilter map[string]TagTest) bool {
 	rms := make([]string, 0, tags.Len())
@@ -36,6 +57,12 @@ func nodeTags(tags TagsEditable, tagsFilter map[string]TagTest) bool {
 			isfeat = true
 		}
 	}
+    if len(rms)>0 || tags.Has("other_tags") {
+        if tt,ok:= tagsFilter["other_tags"]; ok {
+            addOtherTags(tags,rms, tt.Type)
+        }
+    }
+            
 	for _, t := range rms {
 		tags.Delete(t)
 	}
@@ -77,6 +104,11 @@ func wayTags(tags TagsEditable, tagsFilter map[string]TagTest) (int64, bool) {
 	if tags.Has("boundary") /* && tags.Get("boundary")=="administrative"*/ {
 		isp = true
 	}
+    if len(rms)>0 || tags.Has("other_tags") {
+        if tt,ok:= tagsFilter["other_tags"]; ok {
+            addOtherTags(tags,rms, tt.Type)
+        }
+    }
 
 	for _, t := range rms {
 		tags.Delete(t)
@@ -85,6 +117,17 @@ func wayTags(tags TagsEditable, tagsFilter map[string]TagTest) (int64, bool) {
 	zo, _ := find_zorder(tags)
 
 	return zo, isp
+}
+
+func make_ring(waypoints elements.WayPoints) []Coord {
+    cc := make([]Coord,0,waypoints.Len())
+    
+    for i := 0; i < waypoints.Len(); i++ {
+        ln,lt:=waypoints.LonLat(i)
+        c := coordImpl{waypoints.Ref(i),ln,lt}
+        cc = append(cc, c)
+    }
+    return cc
 }
 
 // MakeGeometries converts the nodes and ways of input chan inc into
@@ -114,9 +157,11 @@ func MakeGeometries(inc <-chan elements.ExtendedBlock, tagsFilter map[string]Tag
 					fw := e.(elements.FullWay)
 					zo, isp := wayTags(fw.Tags().(TagsEditable), tagsFilter)
 
-					cc := fw.(interface {
-						Coords() []Coord
-					}).Coords()
+					cc := make_ring(fw.(elements.WayPoints))
+                    if len(cc) == 0 {
+                        fmt.Println("???",fw)
+                        panic("null coords")
+                    }
 					if isp {
 						isp = check_ring(cc)
 					}

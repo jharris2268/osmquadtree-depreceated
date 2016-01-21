@@ -121,6 +121,8 @@ func removeQtt(qtt *qtTree, i uint32, clip bool) {
 	}
 }
 
+
+
 type qtTreeItemI struct {
 	t *qtTreeItem
 	i uint32
@@ -212,6 +214,8 @@ func (qtt *qtTree) findInt(qt quadtree.Quadtree, lastrs uint32, idx uint32) uint
 	return qtt.findInt(qt, lastrs, t.children[nv])
 }
 
+
+
 func (qtt *qtTree) Iter() <-chan QtTreeEntry {
 
 	res := make(chan QtTreeEntry)
@@ -222,6 +226,43 @@ func (qtt *qtTree) Iter() <-chan QtTreeEntry {
 	return res
 }
 
+func countChildren(qtt *qtTree, i uint32) int {
+    t:=qtt.Get(i)
+    ans:=0
+    if t.count>0 {
+        ans += 1
+    }
+    
+    for _,c:=range t.children {
+        if c > 0 {
+            ans += countChildren(qtt,c)
+        }
+    }
+    return ans
+}
+
+func (qtt *qtTree) TrimSmall(minsize int64) int {
+    return trimQttTree(qtt,0,minsize)
+}
+
+func trimQttTree(qtt *qtTree, i uint32, minsize int64) int {
+    
+    t := qtt.Get(i)
+    if t.total <= minsize {
+        nc := countChildren(qtt,i)
+        removeQtt(qtt,i,false)
+        return nc
+    }
+    
+    ans := 0
+    for _,c:=range t.children {
+        if c!=0 {
+            ans += trimQttTree(qtt,c,minsize)
+        }
+    }
+    return ans
+}
+    
 func qtTreeIterInt(qtt *qtTree, i uint32, res chan QtTreeEntry) {
 
 	t := qtt.Get(i)
@@ -277,22 +318,25 @@ func FindQtTree(inchans []chan elements.ExtendedBlock, maxLevel uint) QtTree {
 	return res
 }
 
-func findGroupInt(qtt *qtTree, i uint32, mn int64, mx int64) []uint32 {
+func findGroupInt(qtt *qtTree, i uint32, absmin int64, mn int64, mx int64, target int64) []uint32 {
 	t := qtt.Get(i)
 
-/*
+    
+    diff := t.total-target
+    if diff<0 { diff *= -1 }
+    
 	//look to see if all children (if any) are small
 	alls := true
+    
 	for _, c := range t.children {
 		if c != 0 {
 			cc := qtt.Get(c)
-			if cc.total > 1000 {
+			if cc.total > absmin {
 				alls = false
 			}
+            
 		}
 	}
-*/
-    alls:=false
 	
     //return if:
 	//1. has values itself
@@ -317,11 +361,140 @@ func findGroupInt(qtt *qtTree, i uint32, mn int64, mx int64) []uint32 {
 
 		if c != 0 {
 			//return concat'ed results of the child nodes
-			r = append(r, findGroupInt(qtt, c, mn, mx)...)
+			r = append(r, findGroupInt(qtt, c, absmin, mn, mx, target)...)
 		}
 	}
 	return r
 }
+
+func findGroupIntFlat(qtt *qtTree, i uint32, absmin int64, mn int64, mx int64, target int64) []uint32 {
+//size_t clip_within(std::shared_ptr<qttree> tree, std::set<size_t>& outs, int64 min, int64 max, int64 absmin) {
+    
+    var next_item func(uint32,*qtTreeItem,int) uint32
+    
+    next_item = func(j uint32, t *qtTreeItem, fc int) uint32 {
+		
+		if fc<4 {
+			for _,b := range t.children[fc:] {
+				if b!=0 {
+					return b
+				}
+			}
+		}
+		
+        if (t.parent==j) { return 0 }
+        pc := int((t.quadTree>>(63-2*uint(t.quadTree&31)))&3)
+        
+        par := qtt.Get(t.parent)
+                
+        
+        //std::cout << "t.qt=" << quadtree_string(t.qt) << " next=" << pc+1 << std::endl;
+        return next_item(t.parent,par,pc+1)
+	}
+	
+	
+    res := []uint32{}
+    
+    atend:=false
+    for !atend {
+		
+		t := qtt.Get(i)
+        
+        if t.total >= mn {
+			alls := true
+			
+			for _, c := range t.children {
+				if c != 0 {
+					cc := qtt.Get(c)
+					if cc.total > absmin {
+						alls = false
+					}
+					
+				}
+			}
+			
+			
+            if ((t.count!=0) && ((t.total==t.count) || (t.total <= mx) || alls)) {
+                //std::cout << " add";
+                /*std::cout << "add " << item_string(i,t) << std::endl;
+                tree->rollup(i);*/
+                j:=i
+                
+                res = append(res, i)
+                i = next_item(i,t,4)
+                
+                qtt.Remove(j)
+            } else {
+                i = next_item(i,t,0)
+            }
+        } else {
+            i = next_item(i,t,4)
+            
+        } 
+        //std::cout <<  std::endl;
+        atend = (i==0)
+    }
+    
+    return res
+}
+
+
+func findClosestToTarget_int(qtt *qtTree, i uint32, absmin int64, mn int64, mx int64, target int64) []uint32 {
+    res := []uint32{}
+    t := qtt.Get(i)
+    if t.total < mn {
+        return res
+    }
+    
+        
+    if t.count > 0 && t.total < mx {
+        res = append(res,i)
+        
+        
+    }
+    
+    if t.total > (target+mn) {    
+        for _,c := range t.children {
+            if c!=0 {
+                res=append(res, findClosestToTarget_int(qtt,c,absmin, mn,mx,target)...)
+            }
+        }
+    }
+    
+    if len(res)<2 {
+        return res
+    }
+    
+    curr := res[0]
+    tot:=qtt.Get(curr).total - target
+    if tot<0 {
+        tot *= -1
+    }
+    
+    for _,m := range res[1:] {
+        t:=qtt.Get(m).total-target
+        if t<0 { t*=-1 }
+        if t < tot {
+            curr=m
+            tot=t
+        }
+    }
+    return []uint32{curr}
+}
+
+func findClosestToTarget(qtt *qtTree, i uint32, absmin int64, mn int64, mx int64, target int64) []uint32 {
+    mm := findClosestToTarget_int(qtt,i,absmin, mn,mx,target)
+    if len(mm)==0 {
+        return mm
+    }
+    if len(mm)!=1 {
+        panic(fmt.Sprintf("?? findClosestToTarget %s",mm))
+    }
+    qtt.Remove(mm[0])
+    return mm
+}
+        
+            
 
 func qttCount(qt QtTree) int {
 	c := 0
@@ -338,21 +511,28 @@ func FindQtGroups(qttin QtTree, target int64, minimum int64) QtTree {
 	if !ok {
 		panic("qtt not a *qtTree")
 	}
+    origtotal := qtt.Get(0).total
+    
+    //rems := qtt.TrimSmall(minimum/2)
+    //fmt.Printf("removed %d small\n", rems)
 
-	mn := target - 500
-	mx := target + 500
+	mn := target - 50
+	mx := target + 50
 	foundzero := false
 
 	//result qttree: this will be much smaller
 	nqtt := newQtTree(0, 10)
-
+    numf :=0
+    nextm:=0
 	for qtt.Get(0).total > 1000 && !foundzero {
 
 		cont := true
 		//repeat until we don't find a group between mn and mx, or have found the root
 		for cont && !foundzero {
 
-			r := findGroupInt(qtt, 0, mn, mx)
+			//r := findGroupInt(qtt, 0, minimum, mn, mx,target)
+			r := findGroupIntFlat(qtt, 0, minimum, mn, mx,target)
+            //r := findClosestToTarget(qtt,0,mn,mx,target)
 			for _, ri := range r {
 				if ri == 0 {
 					foundzero = true
@@ -362,28 +542,53 @@ func FindQtGroups(qttin QtTree, target int64, minimum int64) QtTree {
 			cont = len(r) > 0
 			//add found groups to result qttree
 			for _, ri := range r {
-				t := qtt.Get(ri)
+				
+                
+                t := qtt.Get(ri)
 				nqtt.AddMulti(t.quadTree, t.total)
 			}
+			
+			
+            numf += len(r)
+            if numf > nextm || true {
+                nt:=nqtt.Get(0).total
+                fmt.Printf("\r%6d: %10d / %10d [%5.1f%%]",numf,nt,origtotal,float64(nt)*100.0/float64(origtotal))
+                //fmt.Printf("%4d => %6d added %5d [%6d: %10d / %10d [%5.1f%%]]\n",mn,mx,len(r),numf,nt,origtotal,float64(nt)*100.0/float64(origtotal))
+                
+                nextm = numf+1000
+            }
+            
 
 		}
+
+        
 		if foundzero {
 			//finished
 			break
 		}
-		mn -= 500
+		mn -= 50
 		if mn < minimum {
 			mn = minimum
 		}
-		mx += 500
+		mx += 50
 		if mx > 50000 {
 			//failed
-			println("mx=", mx)
-			break
+			//println("mx=", mx)
+            if mx > 1000000 {
+                break
+            }
 		}
 	}
-
+    nt:=nqtt.Get(0).total
+    fmt.Printf("\r%6d: %10d / %10d [%5.1f%%]\n",numf,nt,origtotal,float64(nt)*100.0/float64(origtotal))
+        
+    if mx > 50000 {
+        fmt.Println("maximum:",mx)
+    }
+    
+    
 	t0 := qtt.Get(0)
+    
 	if !foundzero && t0.total > 0 {
 		//items left: dump to file and panic
 		if qttCount(qtt) > 1 {
@@ -393,10 +598,16 @@ func FindQtGroups(qttin QtTree, target int64, minimum int64) QtTree {
 			func() {
 
 				w := bufio.NewWriter(of)
-
+				
+				rc:=0
 				for r := range qtt.Iter() {
-					println(r.String())
+					if rc==100 {
+						println("too many")
+					} else if rc <100 {
+						println(r.String())
+					}
 					w.WriteString(r.String() + "\n")
+					rc+=1
 				}
 				w.Flush()
 			}()
@@ -408,7 +619,10 @@ func FindQtGroups(qttin QtTree, target int64, minimum int64) QtTree {
 		nqtt.AddMulti(0, t0.total)
 
 	}
-
+    if nqtt.Get(0).total != origtotal {
+        panic(fmt.Sprintf("?? %s",nqtt))
+    }
+    
 	return nqtt
 }
 

@@ -34,28 +34,24 @@ type CoordBlockStore interface {
 	NumBlocks() int
 }
 
-func getCoords(cs CoordStore, refs elements.Refs) ([]Coord, error) {
-	res, ok := refs.(interface {
-		Coords() []Coord
-	})
-	if ok {
-		return res.Coords(), nil
-	}
-
-	ans := make([]Coord, 0, refs.Len())
+func getCoords(cs CoordStore, refs elements.Refs) ([]elements.Ref, []int64, []int64, error) {
+	
+    rfs := make([]elements.Ref, refs.Len())
+	lons,lats := make([]int64, refs.Len()), make([]int64, refs.Len())
+    
 	for i := 0; i < refs.Len(); i++ {
-		c := coordImpl{}
+		
 		r := refs.Ref(i)
-		c.ref = r
 		ok := false
-		c.lon, c.lat, ok = cs.Find(r)
+        rfs[i]=r
+		lons[i],lats[i], ok = cs.Find(r)
 
 		if !ok {
-			return nil, errors.New(fmt.Sprintf("Missing node %d @ %d", r, i))
+			return nil,nil, nil, errors.New(fmt.Sprintf("Missing node %d @ %d", r, i))
 		}
-		ans = append(ans, c)
+		
 	}
-	return ans, nil
+	return rfs,lons,lats, nil
 }
 
 type lonLat struct {
@@ -133,12 +129,8 @@ func (mcbs mapCoordBlockStore) Add(bl elements.ExtendedBlock) {
 
 func (mcbs mapCoordBlockStore) NumBlocks() int { return len(mcbs) }
 
-type Coorder interface {
-	Coords() []Coord
-}
-
-//extended way type, with added node locations. Satsifies elements.FullWay and Coorder
-
+//extended way type, with added node locations. Satsifies elements.FullWay and elements.WayPoints
+/*
 type coordWay struct {
 	id   elements.Ref
 	info elements.Info
@@ -146,7 +138,8 @@ type coordWay struct {
 	qt   quadtree.Quadtree
 	ct   elements.ChangeType
 
-	cc []Coord
+	refs []elements.Ref
+    lons,lats []int64
 }
 
 func (tw *coordWay) Type() elements.ElementType      { return elements.Way }
@@ -159,43 +152,51 @@ func (tw *coordWay) Quadtree() quadtree.Quadtree     { return tw.qt }
 func (tw *coordWay) SetChangeType(c elements.ChangeType) { tw.ct = c }
 func (tw *coordWay) SetQuadtree(q quadtree.Quadtree)     { tw.qt = q }
 
-func (tw *coordWay) Len() int               { return len(tw.cc) }
-func (tw *coordWay) Ref(i int) elements.Ref { return tw.cc[i].Ref() }
+func (tw *coordWay) Len() int               { return len(tw.refs) }
+func (tw *coordWay) Ref(i int) elements.Ref { return tw.refs[i] }
 
-func (tw *coordWay) Coords() []Coord { return tw.cc }
+//func (tw *coordWay) Coords() []Coord { return tw.cc }
+func (tw *coordWay) LonLat(i int) (int64,int64) { return tw.lons[i],tw.lats[i] }
 
 func (tw *coordWay) Pack() []byte {
 	//will drop node coordinates, and unpack to a normal elements.FullWay
 	return elements.PackFullElement(tw, elements.PackRefs(tw))
 }
 func (tw *coordWay) String() string {
-	return fmt.Sprintf("CoordsWay: %8d [%4d refs] %-18s", tw.id, len(tw.cc), tw.qt)
+	return fmt.Sprintf("CoordsWay: %8d [%4d refs] %-18s", tw.id, len(tw.refs), tw.qt)
 }
+*/
 
 func makeCoordWay(cbs CoordBlockStore, e elements.Element) (elements.Element, *quadtree.Bbox, error) {
-	ans := coordWay{}
+	
 
 	fw, ok := e.(elements.FullWay)
 	if !ok {
 		return nil, nil, errors.New("Not a FullWay")
 	}
 	var err error
-	ans.cc, err = getCoords(cbs, fw)
-	if err != nil {
-		return nil, nil, err
-	}
-	ans.id = fw.Id()
-	ans.info = fw.Info()
-	ans.tags = MakeTagsEditable(fw.Tags())
-	ans.qt = fw.Quadtree()
-	ans.ct = fw.ChangeType()
-
-	return &ans, makeBbox(ans.cc), nil
+    
+    wp,ok := fw.(elements.FullWayPoints)
+    if ok {
+        wp.SetTags(MakeTagsEditable(fw.Tags()))
+        return wp, makeBboxLL(wp), nil
+    }
+    
+    refs,lons,lats, err := getCoords(cbs, fw)
+    if err != nil {
+        return nil, nil, err
+    }
+    wp = elements.MakeWayPoints(
+        fw.Id(),fw.Info(),MakeTagsEditable(fw.Tags()),
+        refs,lons,lats,
+        fw.Quadtree(), fw.ChangeType())
+    
+	return wp, makeBboxLL(wp), nil
 }
 
 // AddWayCoords converts the FullWay elements from the input chan inc into
 // an extended way type with the node locations added to it. These ways
-// also satisfy the Coorder interface type. It also filters out nodes
+// also satisfy the elements.WayPoints interface type. It also filters out nodes
 // without tags and relations objects without a type tag of
 // "boundary","multipolygon", or "route". If bx is not null
 // it also filters out nodes and ways not present within thay Bbox. The

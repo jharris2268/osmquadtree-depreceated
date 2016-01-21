@@ -62,6 +62,10 @@ type IdSet interface {
 	Add(elements.ElementType, elements.Ref)
 	Contains(elements.ElementType, elements.Ref) bool
 	Len() int
+    
+    AddRaw(int64)
+    Copy() IdSet
+    CopyInto(IdSet)
 }
 
 //A LocTest is a spatial filter, such as a simple Bbox or a Polygon
@@ -90,7 +94,11 @@ func makekey(t elements.ElementType, i elements.Ref) int64 {
 type idSetMap map[int64]bool
 
 func (ids *idSetMap) Add(t elements.ElementType, i elements.Ref) {
-	(*ids)[makekey(t, i)] = true
+	ids.AddRaw(makekey(t,i))
+}
+
+func (ids *idSetMap) AddRaw(k int64) {
+	(*ids)[k] = true
 }
 
 func (ids *idSetMap) Contains(t elements.ElementType, i elements.Ref) bool {
@@ -99,13 +107,31 @@ func (ids *idSetMap) Contains(t elements.ElementType, i elements.Ref) bool {
 }
 func (ids *idSetMap) Len() int { return len(*ids) }
 
+func (ids *idSetMap) Copy() IdSet {
+    new_ids := idSetMap{}
+    for k,v:=range (*ids) {
+        new_ids[k]=v
+    }
+    return &new_ids
+}
+
+func (ids *idSetMap) CopyInto(other IdSet) {
+    for k,_:=range (*ids) {
+        other.AddRaw(k)
+    }
+}
+
 type idSetBitMap struct {
 	mp map[int64]*[1024]uint64
 	cc int
 }
 
 func (ids *idSetBitMap) Add(t elements.ElementType, i elements.Ref) {
-	k := makekey(t, i)
+	ids.AddRaw(makekey(t, i))
+}
+
+func (ids *idSetBitMap) AddRaw(k int64) {
+    
 	l := k / 65536
 	if _, ok := ids.mp[l]; !ok {
 		ids.mp[l] = &[1024]uint64{}
@@ -131,6 +157,34 @@ func (ids *idSetBitMap) Contains(t elements.ElementType, i elements.Ref) bool {
 	a := s / 64
 	b := uint64(1) << (s & 63)
 	return (ids.mp[l][a] & b) != 0
+}
+
+func (ids *idSetBitMap) Copy() IdSet {
+    new_ids := makeIdSetBitMap()
+    for k,v := range ids.mp {
+        nv := [1024]uint64{}
+        for i,j:=range v {
+            nv[i]=j
+        }
+        new_ids.mp[k]=&nv
+    }
+    new_ids.cc=ids.cc
+    return new_ids
+}
+
+func (ids *idSetBitMap) CopyInto(other IdSet) {
+    for key,v:=range ids.mp {
+        if v!=nil {
+            for i,j := range v {        
+                for k:=uint64(0); k < 64; k++ {
+                    if ((j>>k) & 1)==1 {
+                        kk:=key * 65536 + int64(i)*64 + int64(k)
+                        other.AddRaw(kk)
+                    }
+                }
+            }
+        }
+    }
 }
 
 type locTestBbox quadtree.Bbox
@@ -214,9 +268,13 @@ func MakeLocTest(f string) LocTest {
 	return AsLocTest(*fbx)
 }
 
+func makeIdSetBitMap() *idSetBitMap {
+    return &idSetBitMap{map[int64]*[1024]uint64{}, 0}
+}
+
 func MakeIdSet(bm bool) IdSet {
 	if bm {
-		return &idSetBitMap{map[int64]*[1024]uint64{}, 0}
+		return makeIdSetBitMap()
 	}
 	return &idSetMap{}
 }

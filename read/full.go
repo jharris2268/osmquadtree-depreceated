@@ -153,11 +153,18 @@ func (r readObjsFull) way(buf []byte, st []string, ct elements.ChangeType) (elem
 	}
 
 	rfsi := []int64{}
+    
+    lns,lts := []int64{}, []int64{}
+    
 	for _, m := range rem {
 		switch m.Tag {
-		case 8:
-			rfsi, err = utils.ReadDeltaPackedList(m.Data) // node refs
-		}
+            case 8:
+                rfsi, err = utils.ReadDeltaPackedList(m.Data) // node refs
+            case 12:
+                lns,err = utils.ReadDeltaPackedList(m.Data) // lons
+            case 13:
+                lts,err = utils.ReadDeltaPackedList(m.Data) // lats
+        }
 		if err != nil {
 			return nil, err
 		}
@@ -167,7 +174,9 @@ func (r readObjsFull) way(buf []byte, st []string, ct elements.ChangeType) (elem
 	for i, r := range rfsi {
 		rfs[i] = elements.Ref(r)
 	}
-
+    if len(lns)>0 && len(lns)==len(lts) && len(lns)==len(rfs) {
+        return elements.MakeWayPoints(id, info, tag, rfs, lns, lts, qt, ct), nil
+    }
 	return elements.MakeWay(id, info, tag, rfs, qt, ct), nil
 }
 

@@ -159,6 +159,11 @@ type Refs interface {
 	Ref(int) Ref
 }
 
+type WayPoints interface {
+    Refs
+    LonLat(int) (int64,int64)
+}
+
 // Members provides a relation's members
 type Members interface {
 	Len() int
@@ -191,10 +196,18 @@ type FullWay interface {
 	Refs
 }
 
+type FullWayPoints interface {
+	FullElement
+	WayPoints
+    SetTags(Tags)
+}
+
 type FullRelation interface {
 	FullElement
 	Members
 }
+
+
 
 type PackedGeometry interface {
 	FullElement

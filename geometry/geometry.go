@@ -63,11 +63,16 @@ type Geometry interface {
     OriginalType() elements.ElementType
 	AsWkt(bool) string
 	AsWkb(bool) []byte
+    
 	AsGeoJson(bool) interface{}
 	GeometryType() GeometryType
 	GeometryData() []byte
 	Bbox() quadtree.Bbox
 	IsValid() bool
+}
+
+type AsWkbPostgis interface {
+    AsWkbPostgis(bool) [][]byte
 }
 
 type PointGeometry interface {

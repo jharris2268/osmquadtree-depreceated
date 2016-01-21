@@ -43,6 +43,12 @@ func (tos *tempObjStore) add(o elements.Element) {
 func (tos *tempObjStore) get(i int) elements.Element {
 	return tos.c[i/8000][i%8000]
 }
+
+func (tos *tempObjStore) set(i int, o elements.Element) {
+	tos.c[i/8000][i%8000] = elements.PackedElement(o.Pack())
+}
+
+
 func (tos *tempObjStore) Len() int {
 	ct := len(tos.c) - 1
 	if ct < 0 {
@@ -334,7 +340,7 @@ func newChangeEle(e elements.Element, ct elements.ChangeType, q quadtree.Quadtre
 	return ee
 }
 
-func CalcUpdateTiles(prfx string, xmlfn string, enddate elements.Timestamp, newfn string, state int64, lctype string) ([]chan elements.ExtendedBlock, quadtree.QuadtreeSlice, error) {
+func CalcUpdateTiles(prfx string, xmlfn string, enddate elements.Timestamp, newfn string, state int64, lctype string, addwaypoints bool, includeunchangednodes bool) ([]chan elements.ExtendedBlock, quadtree.QuadtreeSlice, error) {
 	changeobjs, nodelocs, objQts, wayNodes, maxts, err := fetchChangeObjs(xmlfn)
 
 	log.Printf("prfx=%s; %d tiles, %d nodelocs, %d objQts, %d waynodes\n",
@@ -409,23 +415,32 @@ func CalcUpdateTiles(prfx string, xmlfn string, enddate elements.Timestamp, newf
 
 			bx := quadtree.NullBbox()
 
-			a, b, c, _, wn := elements.UnpackQtRefs(o.Pack())
-			if c != o.Id() {
-				panic(fmt.Sprintf("?? %s %s %s %d", o, a, b, c))
+			//a, b, c, _, wn := elements.UnpackQtRefs(o.Pack())
+            oo := elements.UnpackElement(o.Pack()).(elements.FullWay)
+            
+			
+            if oo.Id() != o.Id() {
+				panic(fmt.Sprintf("?? %s != %s", o, oo))
 			}
-
-			for k := 0; k < wn.Len(); k++ {
-				n, ok := nodelocs[wn.Ref(k)]
+            
+            rfs := make([]elements.Ref,oo.Len())
+            lons,lats := make([]int64, oo.Len()),make([]int64, oo.Len())
+			for k := 0; k < oo.Len(); k++ {
+                
+				n, ok := nodelocs[oo.Ref(k)]
 
 				if !ok {
-					log.Printf("[%02d] missing node %10d from %s @ %d\n", numMissing, wn.Ref(k), o.String(), k)
+					log.Printf("[%02d] missing node %10d from %s @ %d\n", numMissing, oo.Ref(k), o.String(), k)
 					numMissing++
 					if numMissing >= 100 {
 						panic("too many missing nodes")
 					}
 
 				}
-
+                rfs[k] = oo.Ref(k)
+                if addwaypoints {
+                    lons[k],lats[k] = n.lon,n.lat
+                }
 				bx.ExpandXY(n.lon, n.lat)
 			}
 			q, _ := quadtree.Calculate(*bx, 0.05, 18)
@@ -433,11 +448,17 @@ func CalcUpdateTiles(prfx string, xmlfn string, enddate elements.Timestamp, newf
 				log.Printf("?? way %s has null quadtree %s\n", o.String(), *bx)
 				q = 0
 			}
-
+            
+            if addwaypoints {
+                noo := elements.MakeWayPoints(oo.Id(),oo.Info(),oo.Tags(),rfs,lons,lats,q,oo.ChangeType())
+                changeobjs.set(i,noo)
+            }
+            
 			objQts[packId(o)] = q
 			qss += 1
-			for k := 0; k < wn.Len(); k++ {
-				n := wn.Ref(k)
+			for _,n:=range rfs {
+                
+                    
 				oq, ok := nqts[n]
 				if ok {
 					oq = oq.Common(q)
@@ -445,6 +466,9 @@ func CalcUpdateTiles(prfx string, xmlfn string, enddate elements.Timestamp, newf
 					oq = q
 				}
 				nqts[n] = oq
+                if n==3870653507 {
+                    fmt.Println(n, oq)
+                }
 			}
 
 		}
@@ -652,7 +676,7 @@ func CalcUpdateTiles(prfx string, xmlfn string, enddate elements.Timestamp, newf
 
 		oqt := elements.UnpackElement(o.Pack()).(elements.Quadtreer).Quadtree()
 
-		if nqt != oqt {
+		if includeunchangednodes || (nqt != oqt) {
 			nqi := qttree.Find(nqt)
 			nq := qttree.At(nqi).Quadtree
 

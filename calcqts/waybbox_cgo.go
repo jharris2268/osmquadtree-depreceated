@@ -353,7 +353,9 @@ func newWayBboxTileMmap(qtmmap bool) wayBboxTile {
     res := &wayBboxTileMmap{}
     var err error
     res.data, err = syscall.Mmap(0,0, tileLen*4*4, syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_ANON|syscall.MAP_SHARED)
-    if err!=nil { panic(err.Error()) }
+    
+    if err!=nil { log.Panicf("newWayBboxTileMmap syscall.Mmap %s", err.Error()) }
+    
     if len(res.data)!=tileLen*4*4 {
         log.Panicf("?? len(mm)=%d not %d", len(res.data),tileLen*16)
     }
